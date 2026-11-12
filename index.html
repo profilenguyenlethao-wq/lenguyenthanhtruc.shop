@@ -110,7 +110,6 @@ p{color:var(--text-2)}
 .grid-4{grid-template-columns:repeat(4,1fr)}
 .flex{display:flex}.flex-wrap{flex-wrap:wrap}
 .items-center{align-items:center}.justify-between{justify-content:space-between}
-.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 
 /* ============ BUTTONS ============ */
 .btn{
@@ -504,6 +503,37 @@ tr:hover td{background:rgba(99,102,241,.03)}
 .review-author-info h5{font-size:13px;font-weight:700;margin-bottom:1px}
 .review-author-info span{font-size:11.5px;color:var(--text-3)}
 
+/* ============ CLOUD LOADER (NEW) ============ */
+.cloud-loader{
+  position:fixed;inset:0;z-index:9998;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;
+  transition:opacity .35s ease;
+}
+.cloud-loader.hide{opacity:0;pointer-events:none}
+.cloud-loader .cloud-icon{
+  width:64px;height:64px;border-radius:18px;background:var(--grad);
+  display:grid;place-items:center;color:#fff;
+  box-shadow:0 12px 32px rgba(99,102,241,.4);
+  animation:cloudFloat 2.2s ease-in-out infinite;
+}
+.cloud-loader .cloud-icon svg{width:32px;height:32px}
+@keyframes cloudFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-8px) scale(1.03)}}
+.cloud-loader .spinner{width:42px;height:42px;border-width:4px;margin-top:8px}
+.cloud-loader p{font-size:14px;font-weight:500;color:var(--text-2)}
+
+/* ============ SYNC STATUS BADGE ============ */
+.sync-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:999px;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
+.sync-badge.synced{background:rgba(16,185,129,.15);color:var(--success)}
+.sync-badge.pending{background:rgba(245,158,11,.15);color:var(--warning)}
+.sync-badge.error{background:rgba(239,68,68,.15);color:var(--danger)}
+.sync-badge.offline{background:rgba(148,163,184,.15);color:var(--text-3)}
+.sync-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width:1024px){
   .footer-grid{grid-template-columns:1fr 1fr}
@@ -565,6 +595,13 @@ tr:hover td{background:rgba(99,102,241,.03)}
 </head>
 <body>
 
+<!-- ============ CLOUD LOADER (NEW) ============ -->
+<div class="cloud-loader hide" id="cloudLoader">
+  <div class="cloud-icon"><i data-lucide="cloud"></i></div>
+  <p id="cloudLoaderMsg">Đang tải dữ liệu từ cloud...</p>
+  <div class="spinner"></div>
+</div>
+
 <!-- ============ HEADER ============ -->
 <header class="header">
   <div class="header-inner">
@@ -618,7 +655,7 @@ tr:hover td{background:rgba(99,102,241,.03)}
   </div>
 </div>
 
-<!-- ============ MAIN APP CONTAINER ============ -->
+<!-- ============ MAIN APP ============ -->
 <main id="app"></main>
 
 <!-- ============ FOOTER ============ -->
@@ -673,51 +710,33 @@ tr:hover td{background:rgba(99,102,241,.03)}
   <div class="drawer-footer" id="cartFooter"></div>
 </aside>
 
-<!-- ============ MODAL CONTAINER ============ -->
+<!-- ============ MODAL ============ -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalContent"></div>
 </div>
 
 <!-- ============ TOAST ============ -->
 <div class="toast-container" id="toastContainer"></div>
-
-<!-- ============ HIDDEN FILE INPUTS ============ -->
-<input type="file" id="fileInput" accept="image/*" style="display:none">
-
-<!-- ============ GLOBAL HELPERS ============ -->
-<script>
-/* (Utility functions moved to Part 3) */
-</script>
 <script>
 /* ============================================================
-   NEXUS STORE — Full Client-Side Application
-   Part 3: Data, Storage, Utils, Router, Public Page Renderers
+   PART 3: DATA, STORAGE, CLOUD SYNC, ROUTER, PUBLIC PAGES
    ============================================================ */
 
 'use strict';
 
-/* ---------- CONFIG ---------- */
-const APP_CONFIG = {
-  NAME: 'NexusStore',
-  VERSION: '1.0.0',
-  STORAGE_PREFIX: 'nexus_'
-};
+const APP_CONFIG = { NAME: 'NexusStore', VERSION: '1.1.0', STORAGE_PREFIX: 'nexus_' };
 
-/* ---------- ADMIN PASSWORD (obfuscated charCode array) ---------- */
-/* Password: nguyenlethaomissbo0806 (encoded below) */
+/* Admin password charcodes */
 const _PWD = [110,103,117,121,101,110,108,101,116,104,97,111,109,105,115,115,98,111,48,56,48,54];
 function _verifyPwd(s){ try{ if(s.length!==_PWD.length) return false; for(let i=0;i<_PWD.length;i++){ if(s.charCodeAt(i)!==_PWD[i]) return false; } return true; }catch(e){ return false; } }
 
 /* ---------- DEFAULT DATA ---------- */
 const DEFAULT_PROFILE = {
-  name: 'Nguyễn Lê Thảo',
-  username: '@nguyenlethao',
-  title: 'Digital Creator & MMO Specialist',
+  name: 'Nguyễn Lê Thảo', username: '@nguyenlethao', title: 'Digital Creator & MMO Specialist',
   bio: 'Chào mừng bạn đến với không gian số của mình! Mình chuyên cung cấp tài khoản game, sản phẩm số và dịch vụ MMO chất lượng cao. Uy tín - Nhanh chóng - Bảo hành trọn đời.',
   avatar: 'https://i.pravatar.cc/300?img=47',
   cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=1200&h=400&fit=crop',
-  verified: true,
-  online: true,
+  verified: true, online: true,
   stats: { followers: '12.5K', sales: '3,240', rating: '4.9', years: 3 },
   socials: [
     { name: 'Facebook', url: 'https://facebook.com', icon: 'facebook', color: '#1877f2' },
@@ -726,26 +745,14 @@ const DEFAULT_PROFILE = {
     { name: 'Zalo', url: 'https://zalo.me', icon: 'message-circle', color: '#0068ff' },
     { name: 'YouTube', url: 'https://youtube.com', icon: 'youtube', color: '#ff0000' }
   ],
-  phone: '0900 000 000',
-  email: 'contact@nexus.vn',
-  address: 'TP.HCM, Việt Nam'
+  phone: '0900 000 000', email: 'contact@nexus.vn', address: 'TP.HCM, Việt Nam'
 };
 
-const DEFAULT_CONTACT = {
-  facebook: 'https://facebook.com',
-  zalo: 'https://zalo.me',
-  telegram: 'https://t.me',
-  email: 'contact@nexus.vn',
-  hotline: '0900 000 000',
-  address: 'TP.HCM, Việt Nam'
-};
+const DEFAULT_CONTACT = { facebook: 'https://facebook.com', zalo: 'https://zalo.me', telegram: 'https://t.me', email: 'contact@nexus.vn', hotline: '0900 000 000', address: 'TP.HCM, Việt Nam' };
 
 const DEFAULT_BANK = {
-  bankName: 'Vietcombank',
-  bankBin: '970436',
-  accountNumber: '1234567890',
-  accountName: 'NGUYEN LE THAO',
-  minDeposit: 10000,
+  bankName: 'Vietcombank', bankBin: '970436', accountNumber: '1234567890',
+  accountName: 'NGUYEN LE THAO', minDeposit: 10000,
   suggestedAmounts: [20000, 50000, 100000, 200000, 500000, 1000000],
   note: 'Vui lòng chuyển đúng nội dung để được xử lý nhanh nhất.'
 };
@@ -795,17 +802,10 @@ const DEFAULT_REVIEWS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  theme: 'light',
-  primaryColor: '#6366f1',
-  secondaryColor: '#ec4899',
-  radius: '16px',
-  animations: true,
-  showHero: true,
-  showFeatures: true,
-  showProcess: true,
-  showReviews: true,
-  showFAQ: true,
-  showBlog: true,
+  theme: 'light', primaryColor: '#6366f1', secondaryColor: '#ec4899',
+  radius: '16px', animations: true,
+  showHero: true, showFeatures: true, showProcess: true,
+  showReviews: true, showFAQ: true, showBlog: true,
   siteTitle: 'NexusStore — Digital Profile & Shop',
   heroBadge: 'Digital Store & Profile Platform',
   heroTitle: 'Khám phá không gian số',
@@ -813,56 +813,152 @@ const DEFAULT_SETTINGS = {
   heroDesc: 'Nơi hội tụ tài khoản game cao cấp, sản phẩm số và dịch vụ MMO chuyên nghiệp. Uy tín — Nhanh chóng — Bảo hành trọn đời.'
 };
 
-/* ---------- STORAGE LAYER ---------- */
+/* ---------- STORAGE ---------- */
 const Storage = {
   get(key, def = null) {
-    try {
-      const raw = localStorage.getItem(APP_CONFIG.STORAGE_PREFIX + key);
-      return raw ? JSON.parse(raw) : def;
-    } catch (e) { return def; }
+    try { const raw = localStorage.getItem(APP_CONFIG.STORAGE_PREFIX + key); return raw ? JSON.parse(raw) : def; }
+    catch (e) { return def; }
   },
   set(key, val) {
+    try { localStorage.setItem(APP_CONFIG.STORAGE_PREFIX + key, JSON.stringify(val)); return true; }
+    catch (e) { toast('Lỗi lưu: ' + e.message, 'error'); return false; }
+  },
+  remove(key) { localStorage.removeItem(APP_CONFIG.STORAGE_PREFIX + key); },
+  clearAll() { Object.keys(localStorage).filter(k => k.startsWith(APP_CONFIG.STORAGE_PREFIX)).forEach(k => localStorage.removeItem(k)); }
+};
+
+/* ============================================================
+   CLOUD SYNC MODULE (NEW)
+   Sync admin content to JSONBin.io so all users see updates
+   ============================================================ */
+const Cloud = {
+  config: null,
+  enabled: false,
+  status: 'offline', // offline | synced | pending | error
+  lastSync: null,
+
+  init() {
+    this.config = Storage.get('cloudConfig', null);
+    this.enabled = !!(this.config && this.config.apiKey && this.config.binId);
+    this.status = this.enabled ? 'pending' : 'offline';
+  },
+
+  async pull() {
+    if (!this.enabled) return null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     try {
-      localStorage.setItem(APP_CONFIG.STORAGE_PREFIX + key, JSON.stringify(val));
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}/latest`, {
+        headers: { 'X-Master-Key': this.config.apiKey, 'X-Bin-Meta': 'false' },
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      return data.record || data;
+    } catch (e) {
+      clearTimeout(timeout);
+      throw e;
+    }
+  },
+
+  async push(payload) {
+    if (!this.enabled) return false;
+    try {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.config.apiKey,
+          'X-Bin-Versioning': 'false'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      this.status = 'synced';
+      this.lastSync = Date.now();
+      Storage.set('cloudVersion', payload._version || Date.now());
       return true;
     } catch (e) {
-      toast('Lỗi lưu dữ liệu: ' + e.message, 'error');
+      this.status = 'error';
+      console.warn('Cloud push failed:', e);
       return false;
     }
   },
-  remove(key) {
-    localStorage.removeItem(APP_CONFIG.STORAGE_PREFIX + key);
-  },
-  clearAll() {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(APP_CONFIG.STORAGE_PREFIX));
-    keys.forEach(k => localStorage.removeItem(k));
+
+  async test() {
+    if (!this.config || !this.config.apiKey || !this.config.binId) {
+      return { ok: false, msg: 'Chưa nhập đủ thông tin' };
+    }
+    try {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${this.config.binId}/latest`, {
+        headers: { 'X-Master-Key': this.config.apiKey, 'X-Bin-Meta': 'false' }
+      });
+      if (res.status === 401) return { ok: false, msg: 'API Key sai hoặc không có quyền' };
+      if (res.status === 404) return { ok: false, msg: 'Bin ID không tồn tại' };
+      if (!res.ok) return { ok: false, msg: 'HTTP ' + res.status };
+      const data = await res.json();
+      return { ok: true, msg: 'Kết nối thành công!', data: data.record || data };
+    } catch (e) {
+      return { ok: false, msg: 'Không kết nối được: ' + e.message };
+    }
   }
 };
 
+/* Sync payload — only content that should be visible to all users */
+const SYNC_KEYS = ['profile', 'contact', 'bank', 'products', 'categories', 'blog', 'faq', 'reviews', 'settings'];
+
+function getSyncPayload() {
+  return {
+    _schemaVersion: 1,
+    _version: Date.now(),
+    _updatedAt: new Date().toISOString(),
+    profile: State.profile, contact: State.contact, bank: State.bank,
+    products: State.products, categories: State.categories, blog: State.blog,
+    faq: State.faq, reviews: State.reviews, settings: State.settings
+  };
+}
+
+let _cloudPushTimer = null;
+function scheduleCloudPush() {
+  if (!Cloud.enabled) return;
+  if (_cloudPushTimer) clearTimeout(_cloudPushTimer);
+  Cloud.status = 'pending';
+  updateSyncBadge();
+  _cloudPushTimer = setTimeout(async () => {
+    const payload = getSyncPayload();
+    const ok = await Cloud.push(payload);
+    updateSyncBadge();
+    if (ok) console.log('[Cloud] Pushed v' + payload._version);
+  }, 1200);
+}
+
+function updateSyncBadge() {
+  const el = document.getElementById('syncBadge');
+  if (!el) return;
+  const st = Cloud.status;
+  const map = {
+    synced: { cls: 'synced', txt: 'Đã đồng bộ' },
+    pending: { cls: 'pending', txt: 'Đang đồng bộ...' },
+    error: { cls: 'error', txt: 'Lỗi đồng bộ' },
+    offline: { cls: 'offline', txt: 'Local only' }
+  };
+  const { cls, txt } = map[st] || map.offline;
+  el.className = 'sync-badge ' + cls;
+  el.textContent = txt;
+}
+
 /* ---------- GLOBAL STATE ---------- */
 const State = {
-  profile: null,
-  contact: null,
-  bank: null,
-  products: [],
-  categories: [],
-  blog: [],
-  faq: [],
-  reviews: [],
-  settings: null,
-  cart: [],
-  orders: [],
-  deposits: [],
-  messages: [],
-  isAdmin: false,
-  currentRoute: '/',
+  profile: null, contact: null, bank: null,
+  products: [], categories: [], blog: [], faq: [], reviews: [], settings: null,
+  cart: [], orders: [], deposits: [], messages: [],
+  isAdmin: false, currentRoute: '/',
   shopFilter: { cat: 'all', sort: 'newest', search: '' },
-  shopPage: 1,
-  blogPage: 1,
+  shopPage: 1, blogPage: 1,
   adminTab: 'dashboard'
 };
 
-/* ---------- INIT DATA ---------- */
 function initData() {
   State.profile = Storage.get('profile', DEFAULT_PROFILE);
   State.contact = Storage.get('contact', DEFAULT_CONTACT);
@@ -878,9 +974,41 @@ function initData() {
   State.deposits = Storage.get('deposits', []);
   State.messages = Storage.get('messages', []);
   State.isAdmin = Storage.get('isAdmin', false) === true;
-
-  // Apply settings
   applySettings();
+}
+
+/* Pull from cloud & merge if newer — called at boot */
+async function syncFromCloud() {
+  if (!Cloud.enabled) return false;
+  try {
+    Cloud.status = 'pending';
+    const remote = await Cloud.pull();
+    if (!remote || !remote._version) {
+      Cloud.status = 'offline';
+      return false;
+    }
+    const localVersion = Storage.get('cloudVersion', 0) || 0;
+    if (remote._version > localVersion) {
+      SYNC_KEYS.forEach(k => {
+        if (remote[k] !== undefined) {
+          State[k] = remote[k];
+          Storage.set(k, remote[k]);
+        }
+      });
+      Storage.set('cloudVersion', remote._version);
+      applySettings();
+      Cloud.status = 'synced';
+      Cloud.lastSync = remote._version;
+      console.log('[Cloud] Pulled v' + remote._version);
+      return true; // Signals state changed
+    }
+    Cloud.status = 'synced';
+    return false;
+  } catch (e) {
+    console.warn('[Cloud] Pull failed:', e);
+    Cloud.status = 'error';
+    return false;
+  }
 }
 
 function persist(key) {
@@ -891,7 +1019,10 @@ function persist(key) {
     cart: State.cart, orders: State.orders, deposits: State.deposits,
     messages: State.messages, isAdmin: State.isAdmin
   };
-  if (key in map) Storage.set(key, map[key]);
+  if (key in map) {
+    Storage.set(key, map[key]);
+    if (SYNC_KEYS.includes(key)) scheduleCloudPush();
+  }
 }
 
 /* ---------- SETTINGS APPLY ---------- */
@@ -904,12 +1035,10 @@ function applySettings() {
   document.documentElement.style.setProperty('--radius-lg', `calc(${s.radius} * 1.5)`);
   document.documentElement.style.setProperty('--radius-sm', `calc(${s.radius} * 0.625)`);
   document.title = s.siteTitle || 'NexusStore';
-  // Update gradient with new primary
   const styleId = 'dynamic-grad';
   let el = document.getElementById(styleId);
   if (!el) { el = document.createElement('style'); el.id = styleId; document.head.appendChild(el); }
   el.textContent = `:root{--grad:linear-gradient(135deg,${s.primaryColor} 0%,${shadeColor(s.primaryColor,20)} 50%,${s.secondaryColor} 100%);}`;
-  // Animation toggle
   if (!s.animations) document.body.style.setProperty('transition', 'none');
   else document.body.style.removeProperty('transition');
 }
@@ -954,36 +1083,23 @@ function toast(msg, type = 'info', ms = 3000) {
 
 /* ---------- MODAL ---------- */
 function openModal(html) {
-  const ov = document.getElementById('modalOverlay');
   document.getElementById('modalContent').innerHTML = html;
-  ov.classList.add('open');
+  document.getElementById('modalOverlay').classList.add('open');
   reinitIcons();
 }
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 function confirmDialog(title, message, onConfirm, danger = false) {
   openModal(`
-    <div class="modal-header">
-      <h3>${esc(title)}</h3>
-      <button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button>
-    </div>
+    <div class="modal-header"><h3>${esc(title)}</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body"><p style="color:var(--text-2)">${esc(message)}</p></div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Hủy</button>
-      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirmBtn">Xác nhận</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirmBtn">Xác nhận</button></div>
   `);
   document.getElementById('confirmBtn').onclick = () => { closeModal(); onConfirm(); };
 }
 
 /* ---------- CART ---------- */
-function cartTotal() {
-  return State.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-}
-function cartCount() {
-  return State.cart.reduce((s, i) => s + i.qty, 0);
-}
+function cartTotal() { return State.cart.reduce((s, i) => s + (i.price * i.qty), 0); }
+function cartCount() { return State.cart.reduce((s, i) => s + i.qty, 0); }
 function addToCart(id, qty = 1) {
   const p = State.products.find(x => x.id === id);
   if (!p) return toast('Sản phẩm không tồn tại', 'error');
@@ -1057,10 +1173,7 @@ function openCheckout() {
   if (!State.cart.length) return toast('Giỏ hàng trống', 'warning');
   closeCart();
   openModal(`
-    <div class="modal-header">
-      <h3><i data-lucide="credit-card" style="width:20px;height:20px;vertical-align:-3px"></i> Thanh toán</h3>
-      <button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button>
-    </div>
+    <div class="modal-header"><h3>Thanh toán</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Họ tên <span class="req">*</span></label><input class="form-input" id="ckName" placeholder="Nguyễn Văn A"></div>
       <div class="form-row">
@@ -1079,7 +1192,6 @@ function openCheckout() {
     </div>
   `);
 }
-
 function submitOrder() {
   const name = document.getElementById('ckName').value.trim();
   const phone = document.getElementById('ckPhone').value.trim();
@@ -1087,14 +1199,7 @@ function submitOrder() {
   const note = document.getElementById('ckNote').value.trim();
   if (!name || !phone) return toast('Vui lòng nhập họ tên và SĐT', 'error');
   if (!/^[0-9+\s.-]{8,15}$/.test(phone)) return toast('SĐT không hợp lệ', 'error');
-  const order = {
-    id: 'ORD' + Date.now().toString(36).toUpperCase(),
-    name, phone, email, note,
-    items: State.cart.map(i => ({ ...i })),
-    total: cartTotal(),
-    status: 'pending',
-    created: Date.now()
-  };
+  const order = { id: 'ORD' + Date.now().toString(36).toUpperCase(), name, phone, email, note, items: State.cart.map(i => ({ ...i })), total: cartTotal(), status: 'pending', created: Date.now() };
   State.orders.unshift(order);
   persist('orders');
   State.cart = [];
@@ -1107,18 +1212,14 @@ function submitOrder() {
       <div style="width:72px;height:72px;border-radius:50%;background:rgba(16,185,129,.15);display:grid;place-items:center;margin:0 auto 16px;color:var(--success)"><i data-lucide="check-circle" style="width:36px;height:36px"></i></div>
       <h3 style="margin-bottom:8px">Cảm ơn bạn đã đặt hàng!</h3>
       <p style="margin-bottom:16px">Mã đơn: <strong style="color:var(--primary)">${order.id}</strong></p>
-      <p style="font-size:13px;color:var(--text-2)">Admin sẽ liên hệ xác nhận trong 5-10 phút qua SĐT <strong>${esc(phone)}</strong>. Vui lòng giữ liên lạc.</p>
+      <p style="font-size:13px;color:var(--text-2)">Admin sẽ liên hệ xác nhận trong 5-10 phút qua SĐT <strong>${esc(phone)}</strong>.</p>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-primary btn-block" onclick="closeModal();navigateTo('/shop')">Tiếp tục mua sắm</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-primary btn-block" onclick="closeModal();navigateTo('/shop')">Tiếp tục mua sắm</button></div>
   `);
 }
 
 /* ---------- ROUTER ---------- */
-function navigateTo(path) {
-  window.location.hash = '#' + path;
-}
+function navigateTo(path) { window.location.hash = '#' + path; }
 function parseRoute() {
   let hash = window.location.hash.slice(1) || '/';
   if (!hash.startsWith('/')) hash = '/' + hash;
@@ -1128,17 +1229,11 @@ function parseRoute() {
 function renderRoute() {
   const { path, id } = parseRoute();
   State.currentRoute = path;
-  // Update nav active
-  document.querySelectorAll('#mainNav a').forEach(a => {
-    a.classList.toggle('active', a.dataset.route === path);
-  });
-  document.querySelectorAll('.mobile-nav-inner a').forEach(a => a.classList.remove('active'));
+  document.querySelectorAll('#mainNav a').forEach(a => a.classList.toggle('active', a.dataset.route === path));
   const app = document.getElementById('app');
   const footer = document.getElementById('siteFooter');
-  // Hide footer on admin
-  if (path === '/admin') { footer.style.display = 'none'; } else { footer.style.display = ''; }
+  if (path === '/admin') footer.style.display = 'none'; else footer.style.display = '';
   window.scrollTo({ top: 0, behavior: 'instant' });
-
   try {
     switch (path) {
       case '/': app.innerHTML = renderHome(); break;
@@ -1161,11 +1256,8 @@ function renderRoute() {
     app.innerHTML = `<div class="container section"><div class="empty-state"><h3>Đã xảy ra lỗi</h3><p>${esc(e.message)}</p></div></div>`;
   }
   reinitIcons();
-  // Attach page-specific listeners
   afterRender(path);
 }
-
-/* ---------- AFTER RENDER HOOKS ---------- */
 function afterRender(path) {
   if (path === '/shop') {
     const searchInput = document.getElementById('shopSearch');
@@ -1174,29 +1266,21 @@ function afterRender(path) {
       searchInput.addEventListener('input', debounce((e) => {
         State.shopFilter.search = e.target.value;
         State.shopPage = 1;
-        const app = document.getElementById('app');
-        app.innerHTML = renderShop();
+        document.getElementById('app').innerHTML = renderShop();
         reinitIcons();
         const s = document.getElementById('shopSearch');
         if (s) { s.value = State.shopFilter.search; s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
       }, 300));
     }
   }
-  if (path === '/admin') {
-    if (State.isAdmin) initAdminView();
-  }
+  if (path === '/admin' && State.isAdmin) initAdminView();
 }
-
-/* ============================================================
-   PUBLIC PAGE RENDERERS
-   ============================================================ */
 
 /* ---------- HOME ---------- */
 function renderHome() {
   const s = State.settings;
   const featured = State.products.filter(p => !p.hidden && p.featured).slice(0, 8);
   const latestBlog = State.blog.filter(b => !b.hidden).slice(0, 3);
-
   return `
   <section class="hero">
     <div class="container">
@@ -1268,11 +1352,7 @@ function renderHome() {
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div>
-          <span class="section-eyebrow">Danh mục</span>
-          <h2>Khám phá theo danh mục</h2>
-          <p>Chọn danh mục phù hợp với nhu cầu của bạn</p>
-        </div>
+        <div><span class="section-eyebrow">Danh mục</span><h2>Khám phá theo danh mục</h2><p>Chọn danh mục phù hợp với nhu cầu của bạn</p></div>
         <a href="#/shop" class="btn btn-secondary btn-sm">Xem tất cả <i data-lucide="arrow-right"></i></a>
       </div>
       <div class="grid grid-4">
@@ -1290,95 +1370,51 @@ function renderHome() {
   <section class="section" style="background:var(--bg-2);border-top:1px solid var(--border)">
     <div class="container">
       <div class="section-head">
-        <div>
-          <span class="section-eyebrow">Nổi bật</span>
-          <h2>Sản phẩm bán chạy</h2>
-          <p>Những sản phẩm được khách hàng tin tưởng nhất</p>
-        </div>
+        <div><span class="section-eyebrow">Nổi bật</span><h2>Sản phẩm bán chạy</h2><p>Những sản phẩm được khách hàng tin tưởng nhất</p></div>
         <a href="#/shop" class="btn btn-secondary btn-sm">Xem tất cả <i data-lucide="arrow-right"></i></a>
       </div>
-      <div class="grid grid-4">
-        ${featured.map(p => productCardHTML(p)).join('')}
-      </div>
+      <div class="grid grid-4">${featured.map(p => productCardHTML(p)).join('')}</div>
     </div>
   </section>
 
-  ${s.showProcess ? `
-  <section class="section">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Quy trình</span><h2>Mua hàng chỉ trong 4 bước</h2><p>Đơn giản, nhanh chóng và an toàn tuyệt đối</p></div></div>
-      <div class="process-grid">
-        ${[
-          { n: 1, t: 'Chọn sản phẩm', d: 'Tìm và chọn sản phẩm bạn muốn' },
-          { n: 2, t: 'Thêm vào giỏ', d: 'Nhấn mua để thêm vào giỏ hàng' },
-          { n: 3, t: 'Điền thông tin', d: 'Nhập SĐT và ghi chú đơn hàng' },
-          { n: 4, t: 'Nhận hàng', d: 'Admin xác nhận và giao ngay' }
-        ].map(step => `
-          <div class="process-item">
-            <div class="process-num">${step.n}</div>
-            <h4>${step.t}</h4>
-            <p>${step.d}</p>
-          </div>
-        `).join('')}
-      </div>
+  ${s.showProcess ? `<section class="section"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Quy trình</span><h2>Mua hàng chỉ trong 4 bước</h2><p>Đơn giản, nhanh chóng và an toàn tuyệt đối</p></div></div>
+    <div class="process-grid">
+      ${[
+        { n: 1, t: 'Chọn sản phẩm', d: 'Tìm và chọn sản phẩm bạn muốn' },
+        { n: 2, t: 'Thêm vào giỏ', d: 'Nhấn mua để thêm vào giỏ hàng' },
+        { n: 3, t: 'Điền thông tin', d: 'Nhập SĐT và ghi chú đơn hàng' },
+        { n: 4, t: 'Nhận hàng', d: 'Admin xác nhận và giao ngay' }
+      ].map(step => `<div class="process-item"><div class="process-num">${step.n}</div><h4>${step.t}</h4><p>${step.d}</p></div>`).join('')}
     </div>
-  </section>
-  ` : ''}
+  </div></section>` : ''}
 
-  ${s.showReviews ? `
-  <section class="section" style="background:var(--bg-2);border-top:1px solid var(--border)">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Đánh giá</span><h2>Khách hàng nói gì về chúng tôi</h2><p>Hàng ngàn khách hàng đã tin tưởng và hài lòng</p></div></div>
-      <div class="grid grid-4">
-        ${State.reviews.slice(0,4).map(r => `
-          <div class="review-card">
-            <div class="review-stars">${Array(5).fill('<i data-lucide="star"></i>').join('')}</div>
-            <p class="review-text">"${esc(r.text)}"</p>
-            <div class="review-author">
-              <div class="review-avatar">${esc(r.avatar)}</div>
-              <div class="review-author-info"><h5>${esc(r.name)}</h5><span>${esc(r.date)}</span></div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>
-  ` : ''}
-
-  ${s.showBlog && latestBlog.length ? `
-  <section class="section">
-    <div class="container">
-      <div class="section-head">
-        <div><span class="section-eyebrow">Blog</span><h2>Bài viết mới nhất</h2><p>Chia sẻ kinh nghiệm và thủ thuật hữu ích</p></div>
-        <a href="#/blog" class="btn btn-secondary btn-sm">Xem tất cả <i data-lucide="arrow-right"></i></a>
-      </div>
-      <div class="grid grid-3">
-        ${latestBlog.map(b => blogCardHTML(b)).join('')}
-      </div>
-    </div>
-  </section>
-  ` : ''}
-
-  ${s.showFAQ ? `
-  <section class="section" style="background:var(--bg-2);border-top:1px solid var(--border)">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">FAQ</span><h2>Câu hỏi thường gặp</h2><p>Giải đáp mọi thắc mắc của bạn</p></div></div>
-      <div style="max-width:800px;margin:0 auto">
-        <div class="accordion">
-          ${State.faq.map((f, i) => `
-            <div class="accordion-item" id="faq-${i}">
-              <button class="accordion-head" onclick="toggleAccordion('faq-${i}')">
-                <span>${esc(f.q)}</span>
-                <i data-lucide="chevron-down"></i>
-              </button>
-              <div class="accordion-body"><div class="accordion-body-inner">${esc(f.a)}</div></div>
-            </div>
-          `).join('')}
+  ${s.showReviews ? `<section class="section" style="background:var(--bg-2);border-top:1px solid var(--border)"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Đánh giá</span><h2>Khách hàng nói gì về chúng tôi</h2><p>Hàng ngàn khách hàng đã tin tưởng và hài lòng</p></div></div>
+    <div class="grid grid-4">
+      ${State.reviews.slice(0,4).map(r => `
+        <div class="review-card">
+          <div class="review-stars">${Array(5).fill('<i data-lucide="star"></i>').join('')}</div>
+          <p class="review-text">"${esc(r.text)}"</p>
+          <div class="review-author"><div class="review-avatar">${esc(r.avatar)}</div><div class="review-author-info"><h5>${esc(r.name)}</h5><span>${esc(r.date)}</span></div></div>
         </div>
+      `).join('')}
+    </div>
+  </div></section>` : ''}
+
+  ${s.showBlog && latestBlog.length ? `<section class="section"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Blog</span><h2>Bài viết mới nhất</h2><p>Chia sẻ kinh nghiệm và thủ thuật hữu ích</p></div><a href="#/blog" class="btn btn-secondary btn-sm">Xem tất cả <i data-lucide="arrow-right"></i></a></div>
+    <div class="grid grid-3">${latestBlog.map(b => blogCardHTML(b)).join('')}</div>
+  </div></section>` : ''}
+
+  ${s.showFAQ ? `<section class="section" style="background:var(--bg-2);border-top:1px solid var(--border)"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">FAQ</span><h2>Câu hỏi thường gặp</h2><p>Giải đáp mọi thắc mắc của bạn</p></div></div>
+    <div style="max-width:800px;margin:0 auto">
+      <div class="accordion">
+        ${State.faq.map((f, i) => `<div class="accordion-item" id="faq-${i}"><button class="accordion-head" onclick="toggleAccordion('faq-${i}')"><span>${esc(f.q)}</span><i data-lucide="chevron-down"></i></button><div class="accordion-body"><div class="accordion-body-inner">${esc(f.a)}</div></div></div>`).join('')}
       </div>
     </div>
-  </section>
-  ` : ''}
+  </div></section>` : ''}
 
   <section class="section">
     <div class="container">
@@ -1428,10 +1464,7 @@ function blogCardHTML(b) {
     <a href="#/blog-post/${b.id}" class="blog-card">
       <div class="blog-card-img"><img src="${esc(b.image)}" alt="${esc(b.title)}" loading="lazy" onerror="this.src='https://via.placeholder.com/400x225?text=Blog'"></div>
       <div class="blog-card-body">
-        <div class="blog-card-meta">
-          <span><i data-lucide="calendar"></i> ${new Date(b.date).toLocaleDateString('vi-VN')}</span>
-          <span><i data-lucide="eye"></i> ${b.views}</span>
-        </div>
+        <div class="blog-card-meta"><span><i data-lucide="calendar"></i> ${new Date(b.date).toLocaleDateString('vi-VN')}</span><span><i data-lucide="eye"></i> ${b.views}</span></div>
         <h3 class="blog-card-title">${esc(b.title)}</h3>
         <p class="blog-card-excerpt">${esc(b.excerpt)}</p>
       </div>
@@ -1439,15 +1472,13 @@ function blogCardHTML(b) {
   `;
 }
 
-/* ---------- PROFILE PAGE ---------- */
+/* ---------- PROFILE ---------- */
 function renderProfile() {
   const p = State.profile;
   return `
   <section class="section-sm">
     <div class="container">
-      <div class="profile-cover">
-        <img src="${esc(p.cover)}" alt="cover" onerror="this.style.display='none'">
-      </div>
+      <div class="profile-cover"><img src="${esc(p.cover)}" alt="cover" onerror="this.style.display='none'"></div>
       <div class="profile-card">
         <div class="profile-head">
           <img class="profile-avatar" src="${esc(p.avatar)}" alt="${esc(p.name)}" onerror="this.src='https://i.pravatar.cc/200'">
@@ -1483,32 +1514,23 @@ function renderProfile() {
   <section class="section">
     <div class="container">
       <div class="section-head"><div><span class="section-eyebrow">Sản phẩm của tôi</span><h2>Sản phẩm nổi bật</h2></div><a href="#/shop" class="btn btn-secondary btn-sm">Xem shop <i data-lucide="arrow-right"></i></a></div>
-      <div class="grid grid-4">
-        ${State.products.filter(p => !p.hidden).slice(0,4).map(productCardHTML).join('')}
-      </div>
+      <div class="grid grid-4">${State.products.filter(p => !p.hidden).slice(0,4).map(productCardHTML).join('')}</div>
     </div>
-  </section>
-  `;
+  </section>`;
 }
-
 function copyText(text, msg) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => toast(msg || 'Đã sao chép', 'success')).catch(() => fallbackCopy(text, msg));
-  } else fallbackCopy(text, msg);
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast(msg || 'Đã sao chép', 'success')).catch(() => fallbackCopy(text, msg));
+  else fallbackCopy(text, msg);
 }
 function fallbackCopy(text, msg) {
-  const ta = document.createElement('textarea');
-  ta.value = text; document.body.appendChild(ta); ta.select();
+  const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); toast(msg || 'Đã sao chép', 'success'); } catch (e) { toast('Không thể sao chép', 'error'); }
   ta.remove();
 }
 function shareProfile() {
   const url = window.location.origin + window.location.pathname + '#/profile';
-  if (navigator.share) {
-    navigator.share({ title: State.profile.name, text: State.profile.bio, url }).catch(() => { });
-  } else {
-    copyText(url, 'Đã sao chép link profile');
-  }
+  if (navigator.share) navigator.share({ title: State.profile.name, text: State.profile.bio, url }).catch(() => { });
+  else copyText(url, 'Đã sao chép link profile');
 }
 
 /* ---------- SHOP ---------- */
@@ -1521,24 +1543,17 @@ function renderShop() {
   else if (f.sort === 'price-desc') list.sort((a,b) => b.price - a.price);
   else if (f.sort === 'featured') list.sort((a,b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
   else list.sort((a,b) => (b.created || 0) - (a.created || 0));
-
   const perPage = 12;
   const totalPages = Math.max(1, Math.ceil(list.length / perPage));
   if (State.shopPage > totalPages) State.shopPage = totalPages;
   const start = (State.shopPage - 1) * perPage;
   const pageItems = list.slice(start, start + perPage);
-
   return `
   <section class="section">
     <div class="container">
-      <div class="section-head">
-        <div><span class="section-eyebrow">Cửa hàng</span><h2>Tất cả sản phẩm</h2><p>Tìm thấy ${list.length} sản phẩm</p></div>
-      </div>
+      <div class="section-head"><div><span class="section-eyebrow">Cửa hàng</span><h2>Tất cả sản phẩm</h2><p>Tìm thấy ${list.length} sản phẩm</p></div></div>
       <div class="shop-toolbar">
-        <div class="search-wrap">
-          <i data-lucide="search"></i>
-          <input class="search-input" id="shopSearch" placeholder="Tìm kiếm sản phẩm..." value="${esc(f.search)}">
-        </div>
+        <div class="search-wrap"><i data-lucide="search"></i><input class="search-input" id="shopSearch" placeholder="Tìm kiếm sản phẩm..." value="${esc(f.search)}"></div>
         <select class="form-select" onchange="State.shopFilter.sort=this.value;State.shopPage=1;document.getElementById('app').innerHTML=renderShop();reinitIcons()">
           <option value="newest" ${f.sort==='newest'?'selected':''}>Mới nhất</option>
           <option value="featured" ${f.sort==='featured'?'selected':''}>Nổi bật</option>
@@ -1553,23 +1568,17 @@ function renderShop() {
       ${pageItems.length ? `<div class="grid grid-4">${pageItems.map(productCardHTML).join('')}</div>` : `<div class="empty-state"><i data-lucide="search-x"></i><h3>Không tìm thấy sản phẩm</h3><p>Thử tìm kiếm hoặc chọn danh mục khác</p></div>`}
       ${totalPages > 1 ? renderPagination(totalPages, State.shopPage, 'shop') : ''}
     </div>
-  </section>
-  `;
+  </section>`;
 }
-
 function renderPagination(total, current, type) {
   let html = '<div class="pagination">';
   html += `<button class="page-btn" ${current===1?'disabled':''} onclick="gotoPage('${type}',${current-1})"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></button>`;
   for (let i = 1; i <= total; i++) {
-    if (i === 1 || i === total || Math.abs(i - current) <= 1) {
-      html += `<button class="page-btn ${i===current?'active':''}" onclick="gotoPage('${type}',${i})">${i}</button>`;
-    } else if (Math.abs(i - current) === 2) {
-      html += `<span style="padding:0 4px;color:var(--text-3)">...</span>`;
-    }
+    if (i === 1 || i === total || Math.abs(i - current) <= 1) html += `<button class="page-btn ${i===current?'active':''}" onclick="gotoPage('${type}',${i})">${i}</button>`;
+    else if (Math.abs(i - current) === 2) html += `<span style="padding:0 4px;color:var(--text-3)">...</span>`;
   }
   html += `<button class="page-btn" ${current===total?'disabled':''} onclick="gotoPage('${type}',${current+1})"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></button>`;
-  html += '</div>';
-  return html;
+  return html + '</div>';
 }
 function gotoPage(type, page) {
   if (type === 'shop') { State.shopPage = page; document.getElementById('app').innerHTML = renderShop(); }
@@ -1586,54 +1595,43 @@ function renderProduct(id) {
   const related = State.products.filter(x => x.cat === p.cat && x.id !== p.id && !x.hidden).slice(0, 4);
   const discount = p.original > p.price ? Math.round((1 - p.price / p.original) * 100) : 0;
   return `
-  <section class="section-sm">
-    <div class="container">
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:20px">
-        <a href="#/" style="color:var(--text-3)">Trang chủ</a> / <a href="#/shop" style="color:var(--text-3)">Shop</a> / <span style="color:var(--text)">${esc(p.name)}</span>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:32px">
-        <div>
-          <img src="${esc(p.image)}" alt="${esc(p.name)}" style="width:100%;border-radius:var(--radius-lg);aspect-ratio:4/3;object-fit:cover;box-shadow:var(--shadow-lg)" onerror="this.src='https://via.placeholder.com/600x450'">
+  <section class="section-sm"><div class="container">
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:20px">
+      <a href="#/" style="color:var(--text-3)">Trang chủ</a> / <a href="#/shop" style="color:var(--text-3)">Shop</a> / <span style="color:var(--text)">${esc(p.name)}</span>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:32px">
+      <div><img src="${esc(p.image)}" alt="${esc(p.name)}" style="width:100%;border-radius:var(--radius-lg);aspect-ratio:4/3;object-fit:cover;box-shadow:var(--shadow-lg)" onerror="this.src='https://via.placeholder.com/600x450'"></div>
+      <div>
+        ${cat ? `<span class="badge badge-primary mb-8">${esc(cat.name)}</span>` : ''}
+        ${p.badge ? `<span class="badge badge-accent mb-8" style="margin-left:6px">${esc(p.badge)}</span>` : ''}
+        <h1 style="margin-bottom:12px">${esc(p.name)}</h1>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+          <span style="font-size:1.8rem;font-weight:800;color:var(--primary)">${fmt(p.price)}</span>
+          ${p.original > p.price ? `<span style="text-decoration:line-through;color:var(--text-3)">${fmt(p.original)}</span><span class="badge badge-danger">-${discount}%</span>` : ''}
         </div>
-        <div>
-          ${cat ? `<span class="badge badge-primary mb-8">${esc(cat.name)}</span>` : ''}
-          ${p.badge ? `<span class="badge badge-accent mb-8" style="margin-left:6px">${esc(p.badge)}</span>` : ''}
-          <h1 style="margin-bottom:12px">${esc(p.name)}</h1>
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-            <span style="font-size:1.8rem;font-weight:800;color:var(--primary)">${fmt(p.price)}</span>
-            ${p.original > p.price ? `<span style="text-decoration:line-through;color:var(--text-3)">${fmt(p.original)}</span><span class="badge badge-danger">-${discount}%</span>` : ''}
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-            <span class="badge ${p.stock > 0 ? 'badge-success' : 'badge-danger'}">${p.stock > 0 ? `Còn ${p.stock} sản phẩm` : 'Hết hàng'}</span>
-            <span class="badge badge-info">Bảo hành trọn đời</span>
-            <span class="badge badge-warning">Giao ngay</span>
-          </div>
-          <p style="font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:24px">${esc(p.desc)}</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
-            <button class="btn btn-primary btn-lg" ${p.stock<=0?'disabled':''} onclick="addToCart('${p.id}')"><i data-lucide="shopping-cart"></i> Thêm vào giỏ</button>
-            <button class="btn btn-secondary btn-lg" onclick="navigateTo('/contact')"><i data-lucide="message-circle"></i> Liên hệ tư vấn</button>
-          </div>
-          <div class="card card-flat" style="padding:16px">
-            <div class="info-row"><span class="k"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:-2px"></i> Bảo hành</span><span class="v">Trọn đời</span></div>
-            <div class="info-row"><span class="k"><i data-lucide="truck" style="width:14px;height:14px;vertical-align:-2px"></i> Giao hàng</span><span class="v">Trong 5-10 phút</span></div>
-            <div class="info-row"><span class="k"><i data-lucide="refresh-cw" style="width:14px;height:14px;vertical-align:-2px"></i> Đổi trả</span><span class="v">24h nếu lỗi</span></div>
-          </div>
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+          <span class="badge ${p.stock > 0 ? 'badge-success' : 'badge-danger'}">${p.stock > 0 ? `Còn ${p.stock} sản phẩm` : 'Hết hàng'}</span>
+          <span class="badge badge-info">Bảo hành trọn đời</span>
+          <span class="badge badge-warning">Giao ngay</span>
+        </div>
+        <p style="font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:24px">${esc(p.desc)}</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+          <button class="btn btn-primary btn-lg" ${p.stock<=0?'disabled':''} onclick="addToCart('${p.id}')"><i data-lucide="shopping-cart"></i> Thêm vào giỏ</button>
+          <button class="btn btn-secondary btn-lg" onclick="navigateTo('/contact')"><i data-lucide="message-circle"></i> Liên hệ tư vấn</button>
+        </div>
+        <div class="card card-flat" style="padding:16px">
+          <div class="info-row"><span class="k"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:-2px"></i> Bảo hành</span><span class="v">Trọn đời</span></div>
+          <div class="info-row"><span class="k"><i data-lucide="truck" style="width:14px;height:14px;vertical-align:-2px"></i> Giao hàng</span><span class="v">Trong 5-10 phút</span></div>
+          <div class="info-row"><span class="k"><i data-lucide="refresh-cw" style="width:14px;height:14px;vertical-align:-2px"></i> Đổi trả</span><span class="v">24h nếu lỗi</span></div>
         </div>
       </div>
     </div>
-  </section>
-  ${related.length ? `
-  <section class="section">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Liên quan</span><h2>Sản phẩm tương tự</h2></div></div>
-      <div class="grid grid-4">${related.map(productCardHTML).join('')}</div>
-    </div>
-  </section>` : ''}
-  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+  </div></section>
+  ${related.length ? `<section class="section"><div class="container"><div class="section-head"><div><span class="section-eyebrow">Liên quan</span><h2>Sản phẩm tương tự</h2></div></div><div class="grid grid-4">${related.map(productCardHTML).join('')}</div></div></section>` : ''}
+  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 
-/* ---------- BLOG LIST ---------- */
+/* ---------- BLOG ---------- */
 function renderBlog() {
   const list = State.blog.filter(b => !b.hidden).sort((a,b) => b.date - a.date);
   const perPage = 9;
@@ -1642,16 +1640,12 @@ function renderBlog() {
   const start = (State.blogPage - 1) * perPage;
   const pageItems = list.slice(start, start + perPage);
   return `
-  <section class="section">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Blog</span><h2>Bài viết & Tin tức</h2><p>${list.length} bài viết</p></div></div>
-      ${pageItems.length ? `<div class="grid grid-3">${pageItems.map(blogCardHTML).join('')}</div>` : `<div class="empty-state"><i data-lucide="book-open"></i><h3>Chưa có bài viết</h3></div>`}
-      ${totalPages > 1 ? renderPagination(totalPages, State.blogPage, 'blog') : ''}
-    </div>
-  </section>
-  `;
+  <section class="section"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Blog</span><h2>Bài viết & Tin tức</h2><p>${list.length} bài viết</p></div></div>
+    ${pageItems.length ? `<div class="grid grid-3">${pageItems.map(blogCardHTML).join('')}</div>` : `<div class="empty-state"><i data-lucide="book-open"></i><h3>Chưa có bài viết</h3></div>`}
+    ${totalPages > 1 ? renderPagination(totalPages, State.blogPage, 'blog') : ''}
+  </div></section>`;
 }
-
 function renderBlogPost(id) {
   const b = State.blog.find(x => x.id === id);
   if (!b) return render404();
@@ -1659,74 +1653,61 @@ function renderBlogPost(id) {
   persist('blog');
   const related = State.blog.filter(x => x.id !== b.id && !x.hidden).slice(0, 3);
   return `
-  <section class="section-sm">
-    <div class="container" style="max-width:820px">
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:20px">
-        <a href="#/" style="color:var(--text-3)">Trang chủ</a> / <a href="#/blog" style="color:var(--text-3)">Blog</a> / <span>${esc(b.title)}</span>
-      </div>
-      <span class="badge badge-primary mb-8">${esc(b.cat)}</span>
-      <h1 style="margin-bottom:16px">${esc(b.title)}</h1>
-      <div class="blog-card-meta" style="font-size:13px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-        <span><i data-lucide="user" style="width:14px;height:14px"></i> ${esc(b.author)}</span>
-        <span><i data-lucide="calendar" style="width:14px;height:14px"></i> ${new Date(b.date).toLocaleDateString('vi-VN')}</span>
-        <span><i data-lucide="eye" style="width:14px;height:14px"></i> ${b.views} lượt xem</span>
-      </div>
-      <img src="${esc(b.image)}" alt="${esc(b.title)}" style="width:100%;border-radius:var(--radius);margin-bottom:24px;aspect-ratio:16/9;object-fit:cover" onerror="this.style.display='none'">
-      <div class="blog-content" style="font-size:15px;line-height:1.9;color:var(--text-2)">${b.content}</div>
+  <section class="section-sm"><div class="container" style="max-width:820px">
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:20px"><a href="#/" style="color:var(--text-3)">Trang chủ</a> / <a href="#/blog" style="color:var(--text-3)">Blog</a> / <span>${esc(b.title)}</span></div>
+    <span class="badge badge-primary mb-8">${esc(b.cat)}</span>
+    <h1 style="margin-bottom:16px">${esc(b.title)}</h1>
+    <div class="blog-card-meta" style="font-size:13px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+      <span><i data-lucide="user" style="width:14px;height:14px"></i> ${esc(b.author)}</span>
+      <span><i data-lucide="calendar" style="width:14px;height:14px"></i> ${new Date(b.date).toLocaleDateString('vi-VN')}</span>
+      <span><i data-lucide="eye" style="width:14px;height:14px"></i> ${b.views} lượt xem</span>
     </div>
-  </section>
-  ${related.length ? `<section class="section"><div class="container"><div class="section-head"><div><span class="section-eyebrow">Liên quan</span><h2>Bài viết khác</h2></div></div><div class="grid grid-3">${related.map(blogCardHTML).join('')}</div></div></section>` : ''}
-  `;
+    <img src="${esc(b.image)}" alt="${esc(b.title)}" style="width:100%;border-radius:var(--radius);margin-bottom:24px;aspect-ratio:16/9;object-fit:cover" onerror="this.style.display='none'">
+    <div class="blog-content" style="font-size:15px;line-height:1.9;color:var(--text-2)">${b.content}</div>
+  </div></section>
+  ${related.length ? `<section class="section"><div class="container"><div class="section-head"><div><span class="section-eyebrow">Liên quan</span><h2>Bài viết khác</h2></div></div><div class="grid grid-3">${related.map(blogCardHTML).join('')}</div></div></section>` : ''}`;
 }
 
 /* ---------- DEPOSIT ---------- */
 function renderDeposit() {
   const b = State.bank;
   return `
-  <section class="section">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Nạp tiền</span><h2>Nạp tiền vào tài khoản</h2><p>Nạp tiền nhanh chóng qua chuyển khoản ngân hàng với VietQR</p></div></div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:24px">
-        <div class="card" style="padding:24px">
-          <h3 style="margin-bottom:16px"><i data-lucide="banknote" style="width:20px;height:20px;vertical-align:-3px"></i> Nhập số tiền</h3>
-          <div class="form-group">
-            <label class="form-label">Số tiền muốn nạp <span class="req">*</span></label>
-            <input class="form-input" id="depAmount" type="number" min="${b.minDeposit}" placeholder="Nhập số tiền" value="${b.minDeposit}" style="font-size:18px;font-weight:700">
-            <div class="form-hint">Tối thiểu: ${fmt(b.minDeposit)}</div>
-          </div>
-          <div class="mb-16">
-            <div class="form-label mb-8">Gợi ý mệnh giá</div>
-            <div class="chips" style="margin-bottom:0">
-              ${b.suggestedAmounts.map(a => `<button class="chip" onclick="setDepositAmount(${a})">${fmt(a)}</button>`).join('')}
-            </div>
-          </div>
-          <button class="btn btn-primary btn-block btn-lg" onclick="generateDepositQR()"><i data-lucide="qr-code"></i> Tạo mã QR nạp tiền</button>
-          <div style="margin-top:20px;padding:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;font-size:12.5px;color:var(--text-2)">
-            <strong style="color:var(--warning)">⚠️ Lưu ý:</strong> Hệ thống không tự động cộng tiền. Sau khi chuyển khoản, bạn cần gửi yêu cầu xác nhận. Admin sẽ kiểm tra và duyệt thủ công trong 5-15 phút.
-          </div>
+  <section class="section"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Nạp tiền</span><h2>Nạp tiền vào tài khoản</h2><p>Nạp tiền nhanh chóng qua chuyển khoản ngân hàng với VietQR</p></div></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:24px">
+      <div class="card" style="padding:24px">
+        <h3 style="margin-bottom:16px"><i data-lucide="banknote" style="width:20px;height:20px;vertical-align:-3px"></i> Nhập số tiền</h3>
+        <div class="form-group">
+          <label class="form-label">Số tiền muốn nạp <span class="req">*</span></label>
+          <input class="form-input" id="depAmount" type="number" min="${b.minDeposit}" placeholder="Nhập số tiền" value="${b.minDeposit}" style="font-size:18px;font-weight:700">
+          <div class="form-hint">Tối thiểu: ${fmt(b.minDeposit)}</div>
         </div>
-        <div id="qrResult"></div>
+        <div class="mb-16">
+          <div class="form-label mb-8">Gợi ý mệnh giá</div>
+          <div class="chips" style="margin-bottom:0">${b.suggestedAmounts.map(a => `<button class="chip" onclick="setDepositAmount(${a})">${fmt(a)}</button>`).join('')}</div>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="generateDepositQR()"><i data-lucide="qr-code"></i> Tạo mã QR nạp tiền</button>
+        <div style="margin-top:20px;padding:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;font-size:12.5px;color:var(--text-2)">
+          <strong style="color:var(--warning)">⚠️ Lưu ý:</strong> Hệ thống không tự động cộng tiền. Sau khi chuyển khoản, bạn cần gửi yêu cầu xác nhận. Admin sẽ kiểm tra và duyệt thủ công trong 5-15 phút.
+        </div>
       </div>
-      <div class="mt-32">
-        <h3 class="mb-16">Hướng dẫn nạp tiền</h3>
-        <div class="process-grid">
-          ${[
-            { n: 1, t: 'Nhập số tiền', d: 'Chọn hoặc nhập số tiền muốn nạp' },
-            { n: 2, t: 'Tạo mã QR', d: 'Nhấn nút tạo mã QR VietQR' },
-            { n: 3, t: 'Chuyển khoản', d: 'Quét QR bằng app ngân hàng, chuyển đúng nội dung' },
-            { n: 4, t: 'Xác nhận', d: 'Gửi yêu cầu xác nhận, admin duyệt' }
-          ].map(s => `<div class="process-item"><div class="process-num">${s.n}</div><h4>${s.t}</h4><p>${s.d}</p></div>`).join('')}
-        </div>
+      <div id="qrResult"></div>
+    </div>
+    <div class="mt-32">
+      <h3 class="mb-16">Hướng dẫn nạp tiền</h3>
+      <div class="process-grid">
+        ${[
+          { n: 1, t: 'Nhập số tiền', d: 'Chọn hoặc nhập số tiền muốn nạp' },
+          { n: 2, t: 'Tạo mã QR', d: 'Nhấn nút tạo mã QR VietQR' },
+          { n: 3, t: 'Chuyển khoản', d: 'Quét QR bằng app ngân hàng, chuyển đúng nội dung' },
+          { n: 4, t: 'Xác nhận', d: 'Gửi yêu cầu xác nhận, admin duyệt' }
+        ].map(s => `<div class="process-item"><div class="process-num">${s.n}</div><h4>${s.t}</h4><p>${s.d}</p></div>`).join('')}
       </div>
     </div>
-  </section>
-  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+  </div></section>
+  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
-
-function setDepositAmount(amt) {
-  document.getElementById('depAmount').value = amt;
-}
+function setDepositAmount(amt) { document.getElementById('depAmount').value = amt; }
 function generateDepositQR() {
   const amt = parseInt(document.getElementById('depAmount').value);
   const b = State.bank;
@@ -1734,8 +1715,7 @@ function generateDepositQR() {
   const code = 'NAP' + Date.now().toString(36).toUpperCase();
   const memo = code;
   const qrUrl = `https://img.vietqr.io/image/${b.bankBin}-${b.accountNumber}-compact2.png?amount=${amt}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(b.accountName)}`;
-  const el = document.getElementById('qrResult');
-  el.innerHTML = `
+  document.getElementById('qrResult').innerHTML = `
     <div class="qr-card">
       <h3 style="margin-bottom:16px">Quét mã để chuyển khoản</h3>
       <img class="qr-image" src="${qrUrl}" alt="QR Code" onerror="this.src='https://via.placeholder.com/220x220?text=QR+Error'">
@@ -1748,22 +1728,16 @@ function generateDepositQR() {
         <div class="info-row"><span class="k">Mã nạp</span><span class="v">${code}</span></div>
       </div>
       <div style="margin-top:16px;padding:12px;background:rgba(239,68,68,.08);border-radius:10px;font-size:12.5px;color:var(--text-2);text-align:left">
-        <strong style="color:var(--danger)">Quan trọng:</strong> Ghi đúng nội dung <strong>${memo}</strong> để admin dễ xác nhận. Sau khi chuyển khoản, nhấn nút bên dưới để gửi yêu cầu xác nhận.
+        <strong style="color:var(--danger)">Quan trọng:</strong> Ghi đúng nội dung <strong>${memo}</strong> để admin dễ xác nhận.
       </div>
-      <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitDepositRequest('${code}',${amt})"><i data-lucide="send"></i> Tôi đã chuyển khoản — Gửi xác nhận</button>
+      <button class="btn btn-primary btn-block btn-lg" style="margin-top:14px" onclick="submitDepositRequest('${code}',${amt})"><i data-lucide="send"></i> Tôi đã chuyển khoản</button>
       <a href="${qrUrl}" download="vietqr_${code}.png" class="btn btn-secondary btn-block mt-8" style="text-decoration:none"><i data-lucide="download"></i> Tải QR</a>
-    </div>
-  `;
+    </div>`;
   reinitIcons();
   toast('Đã tạo mã QR nạp tiền', 'success');
 }
-
 function submitDepositRequest(code, amount) {
-  const req = {
-    id: code, amount, status: 'pending',
-    created: Date.now(), note: ''
-  };
-  State.deposits.unshift(req);
+  State.deposits.unshift({ id: code, amount, status: 'pending', created: Date.now(), note: '' });
   persist('deposits');
   openModal(`
     <div class="modal-header"><h3>Đã gửi yêu cầu</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
@@ -1771,49 +1745,44 @@ function submitDepositRequest(code, amount) {
       <div style="width:72px;height:72px;border-radius:50%;background:rgba(59,130,246,.15);display:grid;place-items:center;margin:0 auto 16px;color:var(--info)"><i data-lucide="clock" style="width:36px;height:36px"></i></div>
       <h3 style="margin-bottom:8px">Yêu cầu đang chờ duyệt</h3>
       <p style="margin-bottom:16px">Mã nạp: <strong style="color:var(--primary)">${code}</strong></p>
-      <p style="font-size:13px;color:var(--text-2)">Admin sẽ kiểm tra giao dịch và xác nhận trong 5-15 phút. Nếu quá 30 phút chưa được duyệt, vui lòng liên hệ hotline <strong>${esc(State.contact.hotline)}</strong>.</p>
+      <p style="font-size:13px;color:var(--text-2)">Admin sẽ kiểm tra và xác nhận trong 5-15 phút. Hotline: <strong>${esc(State.contact.hotline)}</strong>.</p>
     </div>
-    <div class="modal-footer"><button class="btn btn-primary btn-block" onclick="closeModal()">Đã hiểu</button></div>
-  `);
+    <div class="modal-footer"><button class="btn btn-primary btn-block" onclick="closeModal()">Đã hiểu</button></div>`);
 }
 
 /* ---------- CONTACT ---------- */
 function renderContact() {
   const c = State.contact;
   return `
-  <section class="section">
-    <div class="container">
-      <div class="section-head"><div><span class="section-eyebrow">Liên hệ</span><h2>Liên hệ với chúng tôi</h2><p>Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7</p></div></div>
-      <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:24px">
-        <div class="card" style="padding:24px">
-          <h3 style="margin-bottom:16px"><i data-lucide="send" style="width:20px;height:20px;vertical-align:-3px"></i> Gửi tin nhắn</h3>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Họ tên <span class="req">*</span></label><input class="form-input" id="ctName" placeholder="Nguyễn Văn A"></div>
-            <div class="form-group"><label class="form-label">SĐT <span class="req">*</span></label><input class="form-input" id="ctPhone" placeholder="0900 000 000"></div>
-          </div>
-          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="ctEmail" type="email" placeholder="email@gmail.com"></div>
-          <div class="form-group"><label class="form-label">Nội dung <span class="req">*</span></label><textarea class="form-textarea" id="ctMsg" placeholder="Nhập nội dung bạn muốn liên hệ..."></textarea></div>
-          <button class="btn btn-primary btn-block btn-lg" onclick="submitContact()"><i data-lucide="send"></i> Gửi liên hệ</button>
+  <section class="section"><div class="container">
+    <div class="section-head"><div><span class="section-eyebrow">Liên hệ</span><h2>Liên hệ với chúng tôi</h2><p>Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7</p></div></div>
+    <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:24px">
+      <div class="card" style="padding:24px">
+        <h3 style="margin-bottom:16px"><i data-lucide="send" style="width:20px;height:20px;vertical-align:-3px"></i> Gửi tin nhắn</h3>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Họ tên <span class="req">*</span></label><input class="form-input" id="ctName" placeholder="Nguyễn Văn A"></div>
+          <div class="form-group"><label class="form-label">SĐT <span class="req">*</span></label><input class="form-input" id="ctPhone" placeholder="0900 000 000"></div>
         </div>
-        <div class="flex col gap-16">
-          ${[
-            { icon: 'facebook', label: 'Facebook', val: c.facebook, color: '#1877f2', href: c.facebook },
-            { icon: 'message-circle', label: 'Zalo', val: c.zalo, color: '#0068ff', href: c.zalo },
-            { icon: 'send', label: 'Telegram', val: c.telegram, color: '#229ed9', href: c.telegram },
-            { icon: 'mail', label: 'Email', val: c.email, color: '#8b5cf6', href: 'mailto:' + c.email },
-            { icon: 'phone', label: 'Hotline', val: c.hotline, color: '#ef4444', href: 'tel:' + c.hotline.replace(/\s/g,'') }
-          ].map(x => `
-            <a href="${esc(x.href)}" target="_blank" class="card card-flat" style="display:flex;align-items:center;gap:12px;padding:16px;text-decoration:none">
-              <div style="width:44px;height:44px;border-radius:12px;background:${x.color};display:grid;place-items:center;color:#fff;flex-shrink:0"><i data-lucide="${x.icon}" style="width:20px;height:20px"></i></div>
-              <div style="min-width:0"><div style="font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">${x.label}</div><div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.val)}</div></div>
-            </a>
-          `).join('')}
-        </div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="ctEmail" type="email" placeholder="email@gmail.com"></div>
+        <div class="form-group"><label class="form-label">Nội dung <span class="req">*</span></label><textarea class="form-textarea" id="ctMsg" placeholder="Nhập nội dung bạn muốn liên hệ..."></textarea></div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="submitContact()"><i data-lucide="send"></i> Gửi liên hệ</button>
+      </div>
+      <div class="flex col gap-16">
+        ${[
+          { icon: 'facebook', label: 'Facebook', val: c.facebook, color: '#1877f2', href: c.facebook },
+          { icon: 'message-circle', label: 'Zalo', val: c.zalo, color: '#0068ff', href: c.zalo },
+          { icon: 'send', label: 'Telegram', val: c.telegram, color: '#229ed9', href: c.telegram },
+          { icon: 'mail', label: 'Email', val: c.email, color: '#8b5cf6', href: 'mailto:' + c.email },
+          { icon: 'phone', label: 'Hotline', val: c.hotline, color: '#ef4444', href: 'tel:' + c.hotline.replace(/\s/g,'') }
+        ].map(x => `
+          <a href="${esc(x.href)}" target="_blank" class="card card-flat" style="display:flex;align-items:center;gap:12px;padding:16px;text-decoration:none">
+            <div style="width:44px;height:44px;border-radius:12px;background:${x.color};display:grid;place-items:center;color:#fff;flex-shrink:0"><i data-lucide="${x.icon}" style="width:20px;height:20px"></i></div>
+            <div style="min-width:0"><div style="font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">${x.label}</div><div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.val)}</div></div>
+          </a>`).join('')}
       </div>
     </div>
-  </section>
-  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1.3fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+  </div></section>
+  <style>@media(max-width:768px){.grid[style*="grid-template-columns:1.3fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 function submitContact() {
   const name = document.getElementById('ctName').value.trim();
@@ -1821,10 +1790,9 @@ function submitContact() {
   const email = document.getElementById('ctEmail').value.trim();
   const msg = document.getElementById('ctMsg').value.trim();
   if (!name || !phone || !msg) return toast('Vui lòng điền đủ thông tin', 'error');
-  const message = { id: uid('msg'), name, phone, email, message: msg, created: Date.now(), read: false };
-  State.messages.unshift(message);
+  State.messages.unshift({ id: uid('msg'), name, phone, email, message: msg, created: Date.now(), read: false });
   persist('messages');
-  toast('Đã gửi liên hệ thành công! Chúng tôi sẽ phản hồi sớm.', 'success', 4000);
+  toast('Đã gửi liên hệ thành công!', 'success', 4000);
   document.getElementById('ctName').value = '';
   document.getElementById('ctPhone').value = '';
   document.getElementById('ctEmail').value = '';
@@ -1833,61 +1801,37 @@ function submitContact() {
 
 /* ---------- SUPPORT / TERMS / PRIVACY / ABOUT ---------- */
 function renderSupport() {
-  return `
-  <section class="section">
-    <div class="container" style="max-width:800px">
-      <div class="section-head"><div><span class="section-eyebrow">Hỗ trợ</span><h2>Trung tâm hỗ trợ</h2></div></div>
-      <div class="accordion mb-24">
-        ${State.faq.map((f,i) => `
-          <div class="accordion-item" id="sp-faq-${i}">
-            <button class="accordion-head" onclick="toggleAccordion('sp-faq-${i}')"><span>${esc(f.q)}</span><i data-lucide="chevron-down"></i></button>
-            <div class="accordion-body"><div class="accordion-body-inner">${esc(f.a)}</div></div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="card" style="text-align:center;padding:24px">
-        <h3 style="margin-bottom:8px">Không tìm thấy câu trả lời?</h3>
-        <p style="margin-bottom:16px">Liên hệ trực tiếp với chúng tôi để được hỗ trợ</p>
-        <a href="#/contact" class="btn btn-primary"><i data-lucide="message-circle"></i> Liên hệ ngay</a>
-      </div>
+  return `<section class="section"><div class="container" style="max-width:800px">
+    <div class="section-head"><div><span class="section-eyebrow">Hỗ trợ</span><h2>Trung tâm hỗ trợ</h2></div></div>
+    <div class="accordion mb-24">
+      ${State.faq.map((f,i) => `<div class="accordion-item" id="sp-faq-${i}"><button class="accordion-head" onclick="toggleAccordion('sp-faq-${i}')"><span>${esc(f.q)}</span><i data-lucide="chevron-down"></i></button><div class="accordion-body"><div class="accordion-body-inner">${esc(f.a)}</div></div></div>`).join('')}
     </div>
-  </section>`;
+    <div class="card" style="text-align:center;padding:24px"><h3 style="margin-bottom:8px">Không tìm thấy câu trả lời?</h3><p style="margin-bottom:16px">Liên hệ trực tiếp với chúng tôi</p><a href="#/contact" class="btn btn-primary"><i data-lucide="message-circle"></i> Liên hệ ngay</a></div>
+  </div></section>`;
 }
 function renderTerms() {
-  return `<section class="section"><div class="container" style="max-width:800px">
-    <div class="section-head"><div><span class="section-eyebrow">Pháp lý</span><h2>Điều khoản sử dụng</h2></div></div>
+  return `<section class="section"><div class="container" style="max-width:800px"><div class="section-head"><div><span class="section-eyebrow">Pháp lý</span><h2>Điều khoản sử dụng</h2></div></div>
     <div class="card" style="padding:24px;font-size:14px;line-height:1.9;color:var(--text-2)">
-      <h3 style="color:var(--text);margin-bottom:8px">1. Chấp nhận điều khoản</h3>
-      <p style="margin-bottom:16px">Khi truy cập và sử dụng website, bạn đồng ý tuân thủ các điều khoản này.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">2. Trách nhiệm người dùng</h3>
-      <p style="margin-bottom:16px">Bạn chịu trách nhiệm về mọi hoạt động dưới tài khoản của mình và cam kết không sử dụng dịch vụ vào mục đích vi phạm pháp luật.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">3. Chính sách bảo hành</h3>
-      <p style="margin-bottom:16px">Sản phẩm được bảo hành theo chính sách riêng. Vui lòng kiểm tra trước khi mua.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">4. Hoàn tiền</h3>
-      <p style="margin-bottom:16px">Hoàn tiền trong 24h nếu sản phẩm lỗi do chúng tôi. Không hoàn tiền cho các trường hợp khác.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">5. Thay đổi điều khoản</h3>
-      <p>Chúng tôi có quyền thay đổi điều khoản mà không cần báo trước. Vui lòng kiểm tra định kỳ.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">1. Chấp nhận điều khoản</h3><p style="margin-bottom:16px">Khi truy cập và sử dụng website, bạn đồng ý tuân thủ các điều khoản này.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">2. Trách nhiệm người dùng</h3><p style="margin-bottom:16px">Bạn chịu trách nhiệm về mọi hoạt động dưới tài khoản của mình và cam kết không sử dụng dịch vụ vào mục đích vi phạm pháp luật.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">3. Chính sách bảo hành</h3><p style="margin-bottom:16px">Sản phẩm được bảo hành theo chính sách riêng. Vui lòng kiểm tra trước khi mua.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">4. Hoàn tiền</h3><p style="margin-bottom:16px">Hoàn tiền trong 24h nếu sản phẩm lỗi do chúng tôi. Không hoàn tiền cho các trường hợp khác.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">5. Thay đổi điều khoản</h3><p>Chúng tôi có quyền thay đổi điều khoản mà không cần báo trước.</p>
     </div>
   </div></section>`;
 }
 function renderPrivacy() {
-  return `<section class="section"><div class="container" style="max-width:800px">
-    <div class="section-head"><div><span class="section-eyebrow">Pháp lý</span><h2>Chính sách bảo mật</h2></div></div>
+  return `<section class="section"><div class="container" style="max-width:800px"><div class="section-head"><div><span class="section-eyebrow">Pháp lý</span><h2>Chính sách bảo mật</h2></div></div>
     <div class="card" style="padding:24px;font-size:14px;line-height:1.9;color:var(--text-2)">
-      <h3 style="color:var(--text);margin-bottom:8px">1. Thu thập thông tin</h3>
-      <p style="margin-bottom:16px">Chúng tôi thu thập tên, SĐT, email khi bạn đặt hàng hoặc liên hệ.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">2. Sử dụng thông tin</h3>
-      <p style="margin-bottom:16px">Thông tin chỉ dùng để xử lý đơn hàng và hỗ trợ khách hàng.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">3. Bảo mật dữ liệu</h3>
-      <p style="margin-bottom:16px">Dữ liệu được lưu trữ trên trình duyệt của bạn (localStorage) và không tự động gửi lên server. Chúng tôi không chia sẻ thông tin cho bên thứ 3.</p>
-      <h3 style="color:var(--text);margin-bottom:8px">4. Cookie</h3>
-      <p>Website sử dụng localStorage để lưu trạng thái giỏ hàng và cài đặt của bạn.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">1. Thu thập thông tin</h3><p style="margin-bottom:16px">Chúng tôi thu thập tên, SĐT, email khi bạn đặt hàng hoặc liên hệ.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">2. Sử dụng thông tin</h3><p style="margin-bottom:16px">Thông tin chỉ dùng để xử lý đơn hàng và hỗ trợ khách hàng.</p>
+      <h3 style="color:var(--text);margin-bottom:8px">3. Bảo mật dữ liệu</h3><p style="margin-bottom:16px">Dữ liệu được lưu trữ trên trình duyệt của bạn (localStorage) và có thể đồng bộ công khai qua Cloud Sync (nếu admin kích hoạt).</p>
+      <h3 style="color:var(--text);margin-bottom:8px">4. Cookie</h3><p>Website sử dụng localStorage để lưu trạng thái giỏ hàng và cài đặt.</p>
     </div>
   </div></section>`;
 }
 function renderAbout() {
-  return `<section class="section"><div class="container" style="max-width:800px">
-    <div class="section-head"><div><span class="section-eyebrow">Giới thiệu</span><h2>Về NexusStore</h2></div></div>
+  return `<section class="section"><div class="container" style="max-width:800px"><div class="section-head"><div><span class="section-eyebrow">Giới thiệu</span><h2>Về NexusStore</h2></div></div>
     <div class="card" style="padding:24px;font-size:14px;line-height:1.9;color:var(--text-2)">
       <p style="margin-bottom:16px"><strong style="color:var(--text)">NexusStore</strong> là nền tảng kinh doanh sản phẩm số và dịch vụ MMO uy tín hàng đầu Việt Nam, được sáng lập bởi <strong>${esc(State.profile.name)}</strong>.</p>
       <p style="margin-bottom:16px">Chúng tôi cung cấp: tài khoản game cao cấp, sản phẩm kỹ thuật số, dịch vụ MMO chuyên nghiệp với cam kết bảo hành trọn đời.</p>
@@ -1895,8 +1839,6 @@ function renderAbout() {
     </div>
   </div></section>`;
 }
-
-/* ---------- 404 ---------- */
 function render404() {
   return `<section class="section"><div class="container"><div class="empty-state">
     <div style="font-size:5rem;font-weight:900;color:var(--text-3);line-height:1">404</div>
@@ -1906,17 +1848,10 @@ function render404() {
   </div></div></section>`;
 }
 
-/* ---------- ACCORDION / MOBILE NAV / THEME ---------- */
-function toggleAccordion(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
-}
-function toggleMobileNav() {
-  document.getElementById('mobileNav').classList.toggle('open');
-}
-function closeMobileNav() {
-  document.getElementById('mobileNav').classList.remove('open');
-}
+/* ---------- ACCORDION / MOBILE / THEME ---------- */
+function toggleAccordion(id) { const el = document.getElementById(id); if (el) el.classList.toggle('open'); }
+function toggleMobileNav() { document.getElementById('mobileNav').classList.toggle('open'); }
+function closeMobileNav() { document.getElementById('mobileNav').classList.remove('open'); }
 function toggleTheme() {
   State.settings.theme = State.settings.theme === 'dark' ? 'light' : 'dark';
   persist('settings');
@@ -1928,42 +1863,30 @@ function toggleTheme() {
 </script>
 <script>
 /* ============================================================
-   PART 4: ADMIN DASHBOARD, LOGIN, CRUD, BACKUP, BOOT
+   PART 4: ADMIN DASHBOARD + CLOUD CONFIG + BOOTSTRAP
    ============================================================ */
 
-/* ---------- ADMIN LOGIN ---------- */
 function renderAdmin() {
   if (!State.isAdmin) return renderLogin();
   return renderAdminDashboard();
 }
 
 function renderLogin() {
-  return `
-  <div class="login-wrap">
-    <div class="login-box">
-      <div class="login-logo"><i data-lucide="shield-check"></i></div>
-      <h2 class="text-center mb-8">Đăng nhập Admin</h2>
-      <p class="text-center text-muted mb-24" style="font-size:13px">Nhập mật khẩu để truy cập bảng điều khiển</p>
-      <div class="form-group">
-        <label class="form-label">Mật khẩu</label>
-        <input type="password" class="form-input" id="adminPwd" placeholder="••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()"><i data-lucide="log-in"></i> Đăng nhập</button>
-      <div class="mt-24 text-center" style="font-size:12px;color:var(--text-3)">
-        <a href="#/" style="color:var(--text-3)"><i data-lucide="arrow-left" style="width:12px;height:12px;vertical-align:-2px"></i> Về trang chủ</a>
-      </div>
-      <div style="margin-top:20px;padding:10px;background:rgba(245,158,11,.1);border-radius:8px;font-size:11.5px;color:var(--text-2);line-height:1.5">
-        <strong style="color:var(--warning)">⚠️ Bảo mật:</strong> Xác thực chạy hoàn toàn client-side. Không dùng cho dữ liệu nhạy cảm.
-      </div>
-    </div>
-  </div>`;
+  return `<div class="login-wrap"><div class="login-box">
+    <div class="login-logo"><i data-lucide="shield-check"></i></div>
+    <h2 class="text-center mb-8">Đăng nhập Admin</h2>
+    <p class="text-center text-muted mb-24" style="font-size:13px">Nhập mật khẩu để truy cập bảng điều khiển</p>
+    <div class="form-group"><label class="form-label">Mật khẩu</label><input type="password" class="form-input" id="adminPwd" placeholder="••••••••" autocomplete="off"></div>
+    <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()"><i data-lucide="log-in"></i> Đăng nhập</button>
+    <div class="mt-24 text-center" style="font-size:12px;color:var(--text-3)"><a href="#/" style="color:var(--text-3)"><i data-lucide="arrow-left" style="width:12px;height:12px;vertical-align:-2px"></i> Về trang chủ</a></div>
+    <div style="margin-top:20px;padding:10px;background:rgba(245,158,11,.1);border-radius:8px;font-size:11.5px;color:var(--text-2);line-height:1.5"><strong style="color:var(--warning)">⚠️ Bảo mật:</strong> Xác thực client-side. Không dùng cho dữ liệu nhạy cảm.</div>
+  </div></div>`;
 }
 
 function doLogin() {
   const pwd = document.getElementById('adminPwd').value;
   if (_verifyPwd(pwd)) {
-    State.isAdmin = true;
-    persist('isAdmin');
+    State.isAdmin = true; persist('isAdmin');
     toast('Đăng nhập thành công', 'success');
     renderRoute();
   } else {
@@ -1971,18 +1894,16 @@ function doLogin() {
     document.getElementById('adminPwd').value = '';
   }
 }
-
 function doLogout() {
-  State.isAdmin = false;
-  persist('isAdmin');
+  State.isAdmin = false; persist('isAdmin');
   toast('Đã đăng xuất', 'success');
   navigateTo('/');
 }
 
-/* ---------- ADMIN DASHBOARD LAYOUT ---------- */
 function renderAdminDashboard() {
   const menuItems = [
     { id: 'dashboard', icon: 'layout-dashboard', label: 'Tổng quan' },
+    { id: 'cloud', icon: 'cloud', label: 'Cloud Sync' },
     { id: 'profile', icon: 'user', label: 'Profile' },
     { id: 'products', icon: 'package', label: 'Sản phẩm' },
     { id: 'categories', icon: 'folder', label: 'Danh mục' },
@@ -1997,33 +1918,35 @@ function renderAdminDashboard() {
     { id: 'content', icon: 'file-text', label: 'Nội dung' },
     { id: 'backup', icon: 'database', label: 'Sao lưu' }
   ];
+  const syncBadge = `<span id="syncBadge" class="sync-badge ${Cloud.status}"></span>`;
   return `
   <div class="admin-layout">
     <aside class="admin-sidebar">
       <div class="admin-menu">
         ${menuItems.map(m => `<div class="admin-menu-item ${State.adminTab===m.id?'active':''}" onclick="switchAdminTab('${m.id}')"><i data-lucide="${m.icon}"></i> ${m.label}</div>`).join('')}
-        <div class="admin-menu-item" onclick="doLogout()" style="color:var(--danger);margin-top:auto"><i data-lucide="log-out"></i> Đăng xuất</div>
+        <div class="admin-menu-item" onclick="doLogout()" style="color:var(--danger);margin-top:16px"><i data-lucide="log-out"></i> Đăng xuất</div>
       </div>
     </aside>
-    <div class="admin-main" id="adminMain">${renderAdminContent()}</div>
+    <div class="admin-main">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">${syncBadge}</div>
+      <div id="adminMain">${renderAdminContent()}</div>
+    </div>
   </div>`;
 }
 
 function switchAdminTab(tab) {
   State.adminTab = tab;
-  document.querySelectorAll('.admin-menu-item').forEach(el => {
-    el.classList.toggle('active', el.textContent.trim() === (document.querySelector(`.admin-menu-item[onclick*="'${tab}'"]`)?.textContent.trim() || ''));
-  });
-  // Re-render
   document.querySelectorAll('.admin-menu-item').forEach(el => el.classList.remove('active'));
   document.querySelectorAll(`.admin-menu-item[onclick*="'${tab}'"]`).forEach(el => el.classList.add('active'));
   document.getElementById('adminMain').innerHTML = renderAdminContent();
   reinitIcons();
+  updateSyncBadge();
 }
 
 function renderAdminContent() {
   switch (State.adminTab) {
     case 'dashboard': return renderAdminDashboardStats();
+    case 'cloud': return renderAdminCloud();
     case 'profile': return renderAdminProfile();
     case 'products': return renderAdminProducts();
     case 'categories': return renderAdminCategories();
@@ -2040,8 +1963,174 @@ function renderAdminContent() {
     default: return renderAdminDashboardStats();
   }
 }
+function initAdminView() { updateSyncBadge(); }
 
-function initAdminView() { /* hooks after render */ }
+/* ---------- ADMIN: CLOUD SYNC (NEW) ---------- */
+function renderAdminCloud() {
+  const cfg = Cloud.config || {};
+  const isEnabled = Cloud.enabled;
+  const statusMap = {
+    synced: { cls: 'success', label: 'Đã kết nối & đồng bộ' },
+    pending: { cls: 'warning', label: 'Đang chờ đồng bộ' },
+    error: { cls: 'danger', label: 'Lỗi kết nối' },
+    offline: { cls: 'info', label: 'Chưa kích hoạt' }
+  };
+  const st = statusMap[Cloud.status] || statusMap.offline;
+  return `
+    <div class="admin-header"><h2>Cloud Sync</h2><span class="badge badge-${st.cls}">${st.label}</span></div>
+
+    <div class="card mb-16" style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(236,72,153,.08));border-color:rgba(99,102,241,.25)">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--grad);display:grid;place-items:center;color:#fff;flex-shrink:0"><i data-lucide="cloud" style="width:22px;height:22px"></i></div>
+        <div style="flex:1">
+          <h4 style="margin-bottom:6px;font-size:15px">Đồng bộ đám mây (JSONBin.io)</h4>
+          <p style="font-size:13px;color:var(--text-2);margin:0;line-height:1.6">
+            <strong>Vấn đề:</strong> Không có backend thì dữ liệu chỉ lưu trên máy của bạn — người dùng khác sẽ không thấy thay đổi.<br>
+            <strong>Giải pháp:</strong> Bật Cloud Sync bằng JSONBin.io (miễn phí) → mọi người dùng tự động tải nội dung mới nhất từ cloud.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    ${!isEnabled ? `
+    <div class="card mb-16">
+      <h3 class="mb-8">Bật Cloud Sync — 3 bước</h3>
+      <ol style="padding-left:20px;font-size:13.5px;color:var(--text-2);line-height:2;margin-bottom:16px">
+        <li>Truy cập <a href="https://jsonbin.io/" target="_blank" style="color:var(--primary);font-weight:600">jsonbin.io</a> → Đăng ký tài khoản miễn phí (Google/Facebook/Email)</li>
+        <li>Vào <strong>API Keys</strong> → Copy <strong>X-Master-Key</strong> (dạng <code style="background:var(--bg-3);padding:2px 6px;border-radius:4px;font-size:12px">$2b$10$...</code>)</li>
+        <li>Vào <strong>Bins → Create Bin</strong> → Tạo bin chứa <code style="background:var(--bg-3);padding:2px 6px;border-radius:4px;font-size:12px">{}</code> → Copy <strong>Bin ID</strong> (24 ký tự)</li>
+      </ol>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">X-Master-Key <span class="req">*</span></label><input class="form-input" id="cloudApiKey" placeholder="$2b$10$..." autocomplete="off"></div>
+        <div class="form-group"><label class="form-label">Bin ID <span class="req">*</span></label><input class="form-input" id="cloudBinId" placeholder="6123a4b5c6d7e8f9..." autocomplete="off"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="testCloudConn()"><i data-lucide="wifi"></i> Test kết nối</button>
+        <button class="btn btn-primary" onclick="saveCloudConfig()"><i data-lucide="save"></i> Kích hoạt Cloud Sync</button>
+      </div>
+      <div id="cloudTestResult" style="margin-top:12px"></div>
+    </div>
+    ` : `
+    <div class="grid grid-2 mb-16">
+      <div class="card">
+        <h3 class="mb-8">Trạng thái</h3>
+        <div class="info-row"><span class="k">Bin ID</span><span class="v" style="font-size:12px;font-family:monospace">${esc((cfg.binId||'').slice(0,10))}...${esc((cfg.binId||'').slice(-6))}</span></div>
+        <div class="info-row"><span class="k">API Key</span><span class="v" style="font-size:12px">${cfg.apiKey ? '••••••••' + cfg.apiKey.slice(-6) : '—'}</span></div>
+        <div class="info-row"><span class="k">Sync lần cuối</span><span class="v">${Cloud.lastSync ? new Date(Cloud.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ'}</span></div>
+        <div class="info-row"><span class="k">Version local</span><span class="v">${Storage.get('cloudVersion', 0) || 0}</span></div>
+      </div>
+      <div class="card">
+        <h3 class="mb-8">Hành động</h3>
+        <button class="btn btn-primary btn-block mb-8" onclick="forcePushCloud()"><i data-lucide="upload-cloud"></i> Đẩy dữ liệu lên Cloud ngay</button>
+        <button class="btn btn-success btn-block mb-8" onclick="forcePullCloud()"><i data-lucide="download-cloud"></i> Kéo dữ liệu mới nhất từ Cloud</button>
+        <button class="btn btn-secondary btn-block mb-8" onclick="testCloudConn()"><i data-lucide="wifi"></i> Test kết nối</button>
+        <button class="btn btn-danger btn-block" onclick="disableCloud()"><i data-lucide="cloud-off"></i> Tắt Cloud Sync</button>
+        <div id="cloudTestResult" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="card" style="background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3)">
+      <strong style="color:var(--success)">✓ Đang hoạt động:</strong>
+      <span style="font-size:13px;color:var(--text-2);margin-left:6px">Mọi thay đổi về sản phẩm, blog, profile, cài đặt... sẽ tự động đẩy lên cloud (sau ~1.2s). Người dùng truy cập website sẽ tự động tải nội dung mới nhất.</span>
+    </div>
+    `}
+
+    <div class="card mt-16" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)">
+      <h4 style="margin-bottom:8px;font-size:14px">📌 Lưu ý quan trọng</h4>
+      <ul style="padding-left:20px;font-size:13px;color:var(--text-2);line-height:1.9;margin:0">
+        <li><strong>Dữ liệu đồng bộ:</strong> Profile, sản phẩm, danh mục, blog, FAQ, đánh giá, cài đặt giao diện, ngân hàng</li>
+        <li><strong>KHÔNG đồng bộ:</strong> Giỏ hàng, đơn hàng, yêu cầu nạp tiền, tin nhắn liên hệ (đây là dữ liệu riêng tư mỗi máy)</li>
+        <li><strong>Bảo mật:</strong> API Key và Bin ID <u>không bao giờ</u> được push lên cloud — chỉ lưu trong trình duyệt admin</li>
+        <li><strong>Miễn phí:</strong> JSONBin.io free tier cho phép 10.000 requests/tháng — đủ cho website nhỏ</li>
+        <li><strong>Giới hạn:</strong> Nếu nhiều admin cùng sửa 1 lúc → last-write-wins (ghi đè lẫn nhau). Chỉ 1 admin nên sửa cùng lúc</li>
+      </ul>
+    </div>
+  `;
+}
+
+async function testCloudConn() {
+  const el = document.getElementById('cloudTestResult');
+  const apiKey = document.getElementById('cloudApiKey')?.value.trim() || Cloud.config?.apiKey;
+  const binId = document.getElementById('cloudBinId')?.value.trim() || Cloud.config?.binId;
+  if (!apiKey || !binId) return toast('Nhập đủ API Key và Bin ID', 'error');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Đang kiểm tra...</div>';
+  const temp = { config: { apiKey, binId } };
+  const saved = Cloud.config;
+  Cloud.config = temp.config;
+  const res = await Cloud.test();
+  Cloud.config = saved;
+  if (res.ok) {
+    el.innerHTML = `<div class="toast success" style="position:static;min-width:auto;animation:none"><i data-lucide="check-circle" style="width:18px;height:18px"></i> ${esc(res.msg)}</div>`;
+    reinitIcons();
+  } else {
+    el.innerHTML = `<div class="toast error" style="position:static;min-width:auto;animation:none"><i data-lucide="x-circle" style="width:18px;height:18px"></i> ${esc(res.msg)}</div>`;
+    reinitIcons();
+  }
+}
+
+async function saveCloudConfig() {
+  const apiKey = document.getElementById('cloudApiKey').value.trim();
+  const binId = document.getElementById('cloudBinId').value.trim();
+  if (!apiKey || !binId) return toast('Nhập đủ thông tin', 'error');
+  // Test first
+  Cloud.config = { apiKey, binId };
+  const res = await Cloud.test();
+  if (!res.ok) {
+    toast('Không kết nối được: ' + res.msg, 'error', 5000);
+    Cloud.config = null;
+    return;
+  }
+  // Save
+  Storage.set('cloudConfig', { apiKey, binId });
+  Cloud.init();
+  // Initial push (current state)
+  const payload = getSyncPayload();
+  const pushed = await Cloud.push(payload);
+  if (pushed) {
+    toast('Đã kích hoạt Cloud Sync và đẩy dữ liệu ban đầu!', 'success', 4000);
+    switchAdminTab('cloud');
+  } else {
+    toast('Kết nối OK nhưng push thất bại. Kiểm tra quyền ghi của bin.', 'warning', 5000);
+    switchAdminTab('cloud');
+  }
+}
+
+function disableCloud() {
+  confirmDialog('Tắt Cloud Sync', 'Người dùng sẽ KHÔNG thấy thay đổi mới nữa (chỉ bạn thấy). Tiếp tục?', () => {
+    Storage.remove('cloudConfig');
+    Storage.remove('cloudVersion');
+    Cloud.config = null; Cloud.enabled = false; Cloud.status = 'offline';
+    toast('Đã tắt Cloud Sync', 'success');
+    switchAdminTab('cloud');
+  }, true);
+}
+
+async function forcePushCloud() {
+  if (!Cloud.enabled) return toast('Cloud chưa kích hoạt', 'warning');
+  toast('Đang đẩy dữ liệu lên cloud...', 'info');
+  const payload = getSyncPayload();
+  const ok = await Cloud.push(payload);
+  updateSyncBadge();
+  if (ok) toast('Đã đẩy dữ liệu lên cloud (version ' + payload._version + ')', 'success');
+  else toast('Push thất bại. Kiểm tra kết nối mạng.', 'error');
+}
+
+async function forcePullCloud() {
+  if (!Cloud.enabled) return toast('Cloud chưa kích hoạt', 'warning');
+  toast('Đang tải từ cloud...', 'info');
+  try {
+    const remote = await Cloud.pull();
+    if (!remote) return toast('Không có dữ liệu trên cloud', 'warning');
+    SYNC_KEYS.forEach(k => {
+      if (remote[k] !== undefined) { State[k] = remote[k]; Storage.set(k, remote[k]); }
+    });
+    if (remote._version) Storage.set('cloudVersion', remote._version);
+    applySettings();
+    toast('Đã tải dữ liệu từ cloud — trang sẽ tải lại', 'success');
+    setTimeout(() => window.location.reload(), 1000);
+  } catch (e) {
+    toast('Lỗi: ' + e.message, 'error');
+  }
+}
 
 /* ---------- ADMIN: DASHBOARD STATS ---------- */
 function renderAdminDashboardStats() {
@@ -2056,66 +2145,35 @@ function renderAdminDashboardStats() {
     { label: 'Doanh thu', val: fmt(State.orders.reduce((s,o)=>s+(o.total||0),0)), icon: 'trending-up', color: '#06b6d4' }
   ];
   return `
-    <div class="admin-header">
-      <div><h2>Tổng quan</h2><p class="text-muted" style="font-size:13px;margin:0">Chào mừng trở lại, ${esc(State.profile.name)}!</p></div>
-      <a href="#/" class="btn btn-secondary btn-sm" target="_blank"><i data-lucide="external-link"></i> Xem website</a>
-    </div>
+    <div class="admin-header"><div><h2>Tổng quan</h2><p class="text-muted" style="font-size:13px;margin:0">Chào mừng trở lại, ${esc(State.profile.name)}!</p></div>
+    <a href="#/" class="btn btn-secondary btn-sm" target="_blank"><i data-lucide="external-link"></i> Xem website</a></div>
     <div class="grid grid-4 mb-24">
-      ${stats.map(s => `
-        <div class="stat-card">
-          <div class="ico" style="background:${s.color}20;color:${s.color}"><i data-lucide="${s.icon}"></i></div>
-          <div class="val">${s.val}</div>
-          <div class="lbl">${s.label}</div>
-        </div>
-      `).join('')}
+      ${stats.map(s => `<div class="stat-card"><div class="ico" style="background:${s.color}20;color:${s.color}"><i data-lucide="${s.icon}"></i></div><div class="val">${s.val}</div><div class="lbl">${s.label}</div></div>`).join('')}
     </div>
     <div class="grid" style="grid-template-columns:1.5fr 1fr;gap:20px">
-      <div class="card">
-        <h3 style="margin-bottom:16px">Đơn hàng gần đây</h3>
-        ${State.orders.length ? `
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Mã</th><th>Khách</th><th>Tổng</th><th>Trạng thái</th></tr></thead>
-            <tbody>
-              ${State.orders.slice(0,5).map(o => `<tr>
-                <td><strong>${esc(o.id)}</strong></td>
-                <td>${esc(o.name)}</td>
-                <td style="color:var(--primary);font-weight:700">${fmt(o.total)}</td>
-                <td><span class="badge badge-${statusColor(o.status)}">${statusLabel(o.status)}</span></td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>` : `<p class="text-muted text-center" style="padding:20px">Chưa có đơn hàng</p>`}
+      <div class="card"><h3 style="margin-bottom:16px">Đơn hàng gần đây</h3>
+        ${State.orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Khách</th><th>Tổng</th><th>Trạng thái</th></tr></thead><tbody>
+          ${State.orders.slice(0,5).map(o => `<tr><td><strong>${esc(o.id)}</strong></td><td>${esc(o.name)}</td><td style="color:var(--primary);font-weight:700">${fmt(o.total)}</td><td><span class="badge badge-${statusColor(o.status)}">${statusLabel(o.status)}</span></td></tr>`).join('')}
+        </tbody></table></div>` : `<p class="text-muted text-center" style="padding:20px">Chưa có đơn hàng</p>`}
       </div>
-      <div class="card">
-        <h3 style="margin-bottom:16px">Yêu cầu nạp tiền</h3>
-        ${State.deposits.length ? `
-        <div style="display:flex;flex-direction:column;gap:10px">
-          ${State.deposits.slice(0,5).map(d => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-3);border-radius:8px;font-size:13px">
-              <div><strong>${esc(d.id)}</strong><br><span style="font-size:11px;color:var(--text-3)">${new Date(d.created).toLocaleString('vi-VN')}</span></div>
-              <div style="text-align:right"><div style="color:var(--primary);font-weight:700">${fmt(d.amount)}</div><span class="badge badge-${statusColor(d.status)}" style="font-size:10px">${statusLabel(d.status)}</span></div>
-            </div>
-          `).join('')}
-        </div>` : `<p class="text-muted text-center" style="padding:20px">Chưa có yêu cầu</p>`}
+      <div class="card"><h3 style="margin-bottom:16px">Yêu cầu nạp tiền</h3>
+        ${State.deposits.length ? `<div style="display:flex;flex-direction:column;gap:10px">${State.deposits.slice(0,5).map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg-3);border-radius:8px;font-size:13px">
+            <div><strong>${esc(d.id)}</strong><br><span style="font-size:11px;color:var(--text-3)">${new Date(d.created).toLocaleString('vi-VN')}</span></div>
+            <div style="text-align:right"><div style="color:var(--primary);font-weight:700">${fmt(d.amount)}</div><span class="badge badge-${statusColor(d.status)}" style="font-size:10px">${statusLabel(d.status)}</span></div>
+          </div>`).join('')}</div>` : `<p class="text-muted text-center" style="padding:20px">Chưa có yêu cầu</p>`}
       </div>
     </div>
-    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1.5fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1.5fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 
-function statusLabel(s) {
-  return { pending: 'Chờ duyệt', confirmed: 'Đã xác nhận', cancelled: 'Đã hủy', delivered: 'Đã giao', rejected: 'Từ chối' }[s] || s;
-}
-function statusColor(s) {
-  return { pending: 'warning', confirmed: 'success', cancelled: 'danger', delivered: 'success', rejected: 'danger' }[s] || 'info';
-}
+function statusLabel(s) { return { pending: 'Chờ duyệt', confirmed: 'Đã xác nhận', cancelled: 'Đã hủy', delivered: 'Đã giao', rejected: 'Từ chối' }[s] || s; }
+function statusColor(s) { return { pending: 'warning', confirmed: 'success', cancelled: 'danger', delivered: 'success', rejected: 'danger' }[s] || 'info'; }
 
 /* ---------- ADMIN: PROFILE ---------- */
 function renderAdminProfile() {
   const p = State.profile;
-  return `
-    <div class="admin-header"><h2>Quản lý Profile</h2></div>
+  return `<div class="admin-header"><h2>Quản lý Profile</h2></div>
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px">
       <div class="card">
         <h3 class="mb-16">Thông tin cơ bản</h3>
@@ -2151,20 +2209,12 @@ function renderAdminProfile() {
         <button class="btn btn-primary btn-block" onclick="saveStats()"><i data-lucide="save"></i> Lưu thống kê</button>
         <h3 class="mb-16 mt-24">Mạng xã hội</h3>
         <div id="socialsList">
-          ${p.socials.map((s,i) => `
-            <div class="card card-flat" style="padding:10px;margin-bottom:8px">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-                <div style="flex:1;min-width:0"><strong style="font-size:13px">${esc(s.name)}</strong><br><span style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(s.url)}</span></div>
-                <button class="btn btn-danger btn-sm" onclick="deleteSocial(${i})"><i data-lucide="trash-2" style="width:13px;height:13px"></i></button>
-              </div>
-            </div>
-          `).join('')}
+          ${p.socials.map((s,i) => `<div class="card card-flat" style="padding:10px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="flex:1;min-width:0"><strong style="font-size:13px">${esc(s.name)}</strong><br><span style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(s.url)}</span></div><button class="btn btn-danger btn-sm" onclick="deleteSocial(${i})"><i data-lucide="trash-2" style="width:13px;height:13px"></i></button></div></div>`).join('')}
         </div>
         <button class="btn btn-secondary btn-block mt-8" onclick="addSocialPrompt()"><i data-lucide="plus"></i> Thêm mạng xã hội</button>
       </div>
     </div>
-    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 function saveProfile() {
   const p = State.profile;
@@ -2180,32 +2230,25 @@ function saveProfile() {
   p.verified = document.getElementById('pfVerified').checked;
   p.online = document.getElementById('pfOnline').checked;
   persist('profile');
-  toast('Đã lưu profile', 'success');
+  toast('Đã lưu profile — đã đồng bộ cloud', 'success');
   renderFooterInfo();
 }
 function saveStats() {
-  State.profile.stats = {
-    followers: document.getElementById('stFollowers').value,
-    sales: document.getElementById('stSales').value,
-    rating: document.getElementById('stRating').value,
-    years: document.getElementById('stYears').value
-  };
+  State.profile.stats = { followers: document.getElementById('stFollowers').value, sales: document.getElementById('stSales').value, rating: document.getElementById('stRating').value, years: document.getElementById('stYears').value };
   persist('profile');
   toast('Đã lưu thống kê', 'success');
 }
 function addSocialPrompt() {
-  openModal(`
-    <div class="modal-header"><h3>Thêm mạng xã hội</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  openModal(`<div class="modal-header"><h3>Thêm mạng xã hội</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Tên</label><input class="form-input" id="socName" placeholder="Facebook"></div>
       <div class="form-group"><label class="form-label">URL</label><input class="form-input" id="socUrl" placeholder="https://facebook.com/..."></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Icon (Lucide)</label><input class="form-input" id="socIcon" value="link"></div>
-        <div class="form-group"><label class="form-label">Màu (hex)</label><input class="form-input" id="socColor" value="#1877f2" type="color"></div>
+        <div class="form-group"><label class="form-label">Màu</label><input class="form-input" id="socColor" value="#1877f2" type="color"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveSocial()">Thêm</button></div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveSocial()">Thêm</button></div>`);
 }
 function saveSocial() {
   const n = document.getElementById('socName').value.trim();
@@ -2213,58 +2256,42 @@ function saveSocial() {
   if (!n || !u) return toast('Nhập đủ thông tin', 'error');
   State.profile.socials.push({ name: n, url: u, icon: document.getElementById('socIcon').value.trim() || 'link', color: document.getElementById('socColor').value });
   persist('profile');
-  closeModal();
-  switchAdminTab('profile');
+  closeModal(); switchAdminTab('profile');
   toast('Đã thêm mạng xã hội', 'success');
 }
 function deleteSocial(i) {
-  confirmDialog('Xóa mạng xã hội', 'Bạn có chắc muốn xóa?', () => {
+  confirmDialog('Xóa mạng xã hội', 'Bạn có chắc?', () => {
     State.profile.socials.splice(i, 1);
-    persist('profile');
-    switchAdminTab('profile');
+    persist('profile'); switchAdminTab('profile');
     toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: PRODUCTS ---------- */
 function renderAdminProducts() {
-  return `
-    <div class="admin-header"><h2>Quản lý sản phẩm</h2><button class="btn btn-primary" onclick="openProductForm()"><i data-lucide="plus"></i> Thêm sản phẩm</button></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Ảnh</th><th>Tên</th><th>Danh mục</th><th>Giá</th><th>Kho</th><th>Nổi bật</th><th>Ẩn</th><th>Hành động</th></tr></thead>
-        <tbody>
-          ${State.products.map(p => `
-            <tr>
-              <td><img src="${esc(p.image)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px" onerror="this.src='https://via.placeholder.com/48'"></td>
-              <td><strong style="font-size:13px">${esc(p.name)}</strong></td>
-              <td>${esc((State.categories.find(c=>c.id===p.cat)||{}).name || p.cat)}</td>
-              <td style="color:var(--primary);font-weight:700">${fmt(p.price)}</td>
-              <td>${p.stock}</td>
-              <td>${p.featured ? '✓' : '—'}</td>
-              <td>${p.hidden ? '✓' : '—'}</td>
-              <td>
-                <button class="btn btn-secondary btn-sm" onclick="openProductForm('${p.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-              </td>
-            </tr>
-          `).join('') || '<tr><td colspan="8" class="text-center" style="padding:30px">Chưa có sản phẩm</td></tr>'}
-        </tbody>
-      </table>
-    </div>
-  `;
+  return `<div class="admin-header"><h2>Quản lý sản phẩm</h2><button class="btn btn-primary" onclick="openProductForm()"><i data-lucide="plus"></i> Thêm sản phẩm</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Ảnh</th><th>Tên</th><th>Danh mục</th><th>Giá</th><th>Kho</th><th>Nổi bật</th><th>Ẩn</th><th>Hành động</th></tr></thead><tbody>
+      ${State.products.map(p => `<tr>
+        <td><img src="${esc(p.image)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px" onerror="this.src='https://via.placeholder.com/48'"></td>
+        <td><strong style="font-size:13px">${esc(p.name)}</strong></td>
+        <td>${esc((State.categories.find(c=>c.id===p.cat)||{}).name || p.cat)}</td>
+        <td style="color:var(--primary);font-weight:700">${fmt(p.price)}</td>
+        <td>${p.stock}</td><td>${p.featured ? '✓' : '—'}</td><td>${p.hidden ? '✓' : '—'}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="openProductForm('${p.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="text-center" style="padding:30px">Chưa có sản phẩm</td></tr>'}
+    </tbody></table></div>`;
 }
 function openProductForm(id) {
   const p = id ? State.products.find(x => x.id === id) : { name: '', cat: State.categories[0]?.id || '', price: 0, original: 0, image: '', desc: '', stock: 0, featured: false, hidden: false, badge: '' };
-  openModal(`
-    <div class="modal-header"><h3>${id ? 'Sửa' : 'Thêm'} sản phẩm</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  openModal(`<div class="modal-header"><h3>${id?'Sửa':'Thêm'} sản phẩm</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Tên sản phẩm <span class="req">*</span></label><input class="form-input" id="pdName" value="${esc(p.name)}"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Danh mục</label>
-          <select class="form-select" id="pdCat">${State.categories.map(c => `<option value="${c.id}" ${p.cat===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
-        </div>
-        <div class="form-group"><label class="form-label">Nhãn (badge)</label><input class="form-input" id="pdBadge" value="${esc(p.badge||'')}" placeholder="HOT, NEW, VIP..."></div>
+        <div class="form-group"><label class="form-label">Danh mục</label><select class="form-select" id="pdCat">${State.categories.map(c => `<option value="${c.id}" ${p.cat===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Nhãn (badge)</label><input class="form-input" id="pdBadge" value="${esc(p.badge||'')}" placeholder="HOT, NEW..."></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Giá bán</label><input type="number" class="form-input" id="pdPrice" value="${p.price}"></div>
@@ -2280,71 +2307,40 @@ function openProductForm(id) {
         </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Hủy</button>
-      <button class="btn btn-primary" onclick="saveProduct(${id ? `'${id}'` : 'null'})"><i data-lucide="save"></i> Lưu</button>
-    </div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveProduct(${id?`'${id}'`:'null'})"><i data-lucide="save"></i> Lưu</button></div>`);
 }
 function saveProduct(id) {
   const data = {
-    name: document.getElementById('pdName').value.trim(),
-    cat: document.getElementById('pdCat').value,
-    price: parseInt(document.getElementById('pdPrice').value) || 0,
-    original: parseInt(document.getElementById('pdOrig').value) || 0,
+    name: document.getElementById('pdName').value.trim(), cat: document.getElementById('pdCat').value,
+    price: parseInt(document.getElementById('pdPrice').value) || 0, original: parseInt(document.getElementById('pdOrig').value) || 0,
     image: document.getElementById('pdImage').value.trim() || 'https://via.placeholder.com/400x250',
-    desc: document.getElementById('pdDesc').value.trim(),
-    stock: parseInt(document.getElementById('pdStock').value) || 0,
+    desc: document.getElementById('pdDesc').value.trim(), stock: parseInt(document.getElementById('pdStock').value) || 0,
     badge: document.getElementById('pdBadge').value.trim(),
-    featured: document.getElementById('pdFeatured').checked,
-    hidden: document.getElementById('pdHidden').checked
+    featured: document.getElementById('pdFeatured').checked, hidden: document.getElementById('pdHidden').checked
   };
   if (!data.name) return toast('Nhập tên sản phẩm', 'error');
-  if (id) {
-    const idx = State.products.findIndex(x => x.id === id);
-    Object.assign(State.products[idx], data);
-    toast('Đã cập nhật sản phẩm', 'success');
-  } else {
-    State.products.unshift({ id: uid('p'), ...data, created: Date.now() });
-    toast('Đã thêm sản phẩm', 'success');
-  }
-  persist('products');
-  closeModal();
-  switchAdminTab('products');
+  if (id) { Object.assign(State.products.find(x => x.id === id), data); toast('Đã cập nhật — đã sync cloud', 'success'); }
+  else { State.products.unshift({ id: uid('p'), ...data, created: Date.now() }); toast('Đã thêm — đã sync cloud', 'success'); }
+  persist('products'); closeModal(); switchAdminTab('products');
 }
 function deleteProduct(id) {
-  confirmDialog('Xóa sản phẩm', 'Bạn có chắc muốn xóa sản phẩm này?', () => {
+  confirmDialog('Xóa sản phẩm', 'Xóa vĩnh viễn?', () => {
     State.products = State.products.filter(x => x.id !== id);
-    persist('products');
-    switchAdminTab('products');
-    toast('Đã xóa sản phẩm', 'success');
+    persist('products'); switchAdminTab('products');
+    toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: CATEGORIES ---------- */
 function renderAdminCategories() {
-  return `
-    <div class="admin-header"><h2>Quản lý danh mục</h2><button class="btn btn-primary" onclick="openCategoryForm()"><i data-lucide="plus"></i> Thêm danh mục</button></div>
-    <div class="grid grid-3">
-      ${State.categories.map(c => `
-        <div class="card">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-            <div style="width:40px;height:40px;border-radius:10px;background:${c.color};display:grid;place-items:center;color:#fff"><i data-lucide="${c.icon}"></i></div>
-            <div><strong style="font-size:14px">${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text-3)">${State.products.filter(p=>p.cat===c.id).length} sản phẩm</span></div>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openCategoryForm('${c.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i> Sửa</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  return `<div class="admin-header"><h2>Quản lý danh mục</h2><button class="btn btn-primary" onclick="openCategoryForm()"><i data-lucide="plus"></i> Thêm danh mục</button></div>
+    <div class="grid grid-3">${State.categories.map(c => `<div class="card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:40px;height:40px;border-radius:10px;background:${c.color};display:grid;place-items:center;color:#fff"><i data-lucide="${c.icon}"></i></div><div><strong style="font-size:14px">${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text-3)">${State.products.filter(p=>p.cat===c.id).length} sản phẩm</span></div></div>
+      <div style="display:flex;gap:6px"><button class="btn btn-secondary btn-sm" style="flex:1" onclick="openCategoryForm('${c.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i> Sửa</button><button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></div>
+    </div>`).join('')}</div>`;
 }
 function openCategoryForm(id) {
   const c = id ? State.categories.find(x => x.id === id) : { name: '', icon: 'folder', color: '#6366f1' };
-  openModal(`
-    <div class="modal-header"><h3>${id ? 'Sửa' : 'Thêm'} danh mục</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  openModal(`<div class="modal-header"><h3>${id?'Sửa':'Thêm'} danh mục</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Tên</label><input class="form-input" id="catName" value="${esc(c.name)}"></div>
       <div class="form-row">
@@ -2352,8 +2348,7 @@ function openCategoryForm(id) {
         <div class="form-group"><label class="form-label">Màu</label><input type="color" class="form-input" id="catColor" value="${c.color}" style="height:44px"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveCategory(${id?`'${id}'`:'null'})">Lưu</button></div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveCategory(${id?`'${id}'`:'null'})">Lưu</button></div>`);
 }
 function saveCategory(id) {
   const name = document.getElementById('catName').value.trim();
@@ -2361,52 +2356,35 @@ function saveCategory(id) {
   const data = { name, icon: document.getElementById('catIcon').value.trim() || 'folder', color: document.getElementById('catColor').value };
   if (id) { Object.assign(State.categories.find(x => x.id === id), data); toast('Đã cập nhật', 'success'); }
   else { State.categories.push({ id: uid('cat'), ...data }); toast('Đã thêm', 'success'); }
-  persist('categories');
-  closeModal();
-  switchAdminTab('categories');
+  persist('categories'); closeModal(); switchAdminTab('categories');
 }
 function deleteCategory(id) {
   confirmDialog('Xóa danh mục', 'Sản phẩm trong danh mục sẽ không bị xóa.', () => {
     State.categories = State.categories.filter(x => x.id !== id);
-    persist('categories');
-    switchAdminTab('categories');
+    persist('categories'); switchAdminTab('categories');
     toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: ORDERS ---------- */
 function renderAdminOrders() {
-  return `
-    <div class="admin-header"><h2>Quản lý đơn hàng</h2><span class="badge badge-info">${State.orders.length} đơn</span></div>
-    ${State.orders.length ? `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Mã</th><th>Khách</th><th>SĐT</th><th>Tổng</th><th>Trạng thái</th><th>Ngày</th><th>Hành động</th></tr></thead>
-        <tbody>
-          ${State.orders.map(o => `
-            <tr>
-              <td><strong>${esc(o.id)}</strong></td>
-              <td>${esc(o.name)}</td>
-              <td>${esc(o.phone)}</td>
-              <td style="color:var(--primary);font-weight:700">${fmt(o.total)}</td>
-              <td><span class="badge badge-${statusColor(o.status)}">${statusLabel(o.status)}</span></td>
-              <td style="font-size:12px">${new Date(o.created).toLocaleDateString('vi-VN')}</td>
-              <td>
-                <button class="btn btn-secondary btn-sm" onclick="viewOrder('${o.id}')"><i data-lucide="eye" style="width:12px;height:12px"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>` : `<div class="empty-state"><i data-lucide="receipt"></i><h3>Chưa có đơn hàng</h3></div>`}
-  `;
+  return `<div class="admin-header"><h2>Quản lý đơn hàng</h2><span class="badge badge-info">${State.orders.length} đơn</span></div>
+    ${State.orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Khách</th><th>SĐT</th><th>Tổng</th><th>Trạng thái</th><th>Ngày</th><th>Hành động</th></tr></thead><tbody>
+      ${State.orders.map(o => `<tr>
+        <td><strong>${esc(o.id)}</strong></td><td>${esc(o.name)}</td><td>${esc(o.phone)}</td>
+        <td style="color:var(--primary);font-weight:700">${fmt(o.total)}</td>
+        <td><span class="badge badge-${statusColor(o.status)}">${statusLabel(o.status)}</span></td>
+        <td style="font-size:12px">${new Date(o.created).toLocaleDateString('vi-VN')}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="viewOrder('${o.id}')"><i data-lucide="eye" style="width:12px;height:12px"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty-state"><i data-lucide="receipt"></i><h3>Chưa có đơn hàng</h3></div>`}`;
 }
 function viewOrder(id) {
-  const o = State.orders.find(x => x.id === id);
-  if (!o) return;
-  openModal(`
-    <div class="modal-header"><h3>Đơn ${esc(o.id)}</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  const o = State.orders.find(x => x.id === id); if (!o) return;
+  openModal(`<div class="modal-header"><h3>Đơn ${esc(o.id)}</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="info-row"><span class="k">Khách hàng</span><span class="v">${esc(o.name)}</span></div>
       <div class="info-row"><span class="k">SĐT</span><span class="v">${esc(o.phone)}</span></div>
@@ -2415,24 +2393,13 @@ function viewOrder(id) {
       <div class="info-row"><span class="k">Trạng thái</span><span class="v"><span class="badge badge-${statusColor(o.status)}">${statusLabel(o.status)}</span></span></div>
       ${o.note ? `<div class="info-row"><span class="k">Ghi chú</span><span class="v">${esc(o.note)}</span></div>` : ''}
       <h4 style="margin-top:16px;margin-bottom:8px">Sản phẩm</h4>
-      ${o.items.map(it => `
-        <div style="display:flex;gap:10px;padding:8px;background:var(--bg-3);border-radius:8px;margin-bottom:6px">
-          <img src="${esc(it.image)}" style="width:44px;height:44px;border-radius:6px;object-fit:cover">
-          <div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(it.name)}</div><div style="font-size:12px;color:var(--text-3)">SL: ${it.qty} × ${fmt(it.price)}</div></div>
-        </div>
-      `).join('')}
+      ${o.items.map(it => `<div style="display:flex;gap:10px;padding:8px;background:var(--bg-3);border-radius:8px;margin-bottom:6px"><img src="${esc(it.image)}" style="width:44px;height:44px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(it.name)}</div><div style="font-size:12px;color:var(--text-3)">SL: ${it.qty} × ${fmt(it.price)}</div></div></div>`).join('')}
       <div class="flex justify-between items-center mt-16" style="font-size:15px"><span>Tổng:</span><strong style="color:var(--primary);font-size:1.2rem">${fmt(o.total)}</strong></div>
-      <div class="form-group mt-16"><label class="form-label">Cập nhật trạng thái</label>
-        <select class="form-select" id="ordStatus">
-          ${['pending','confirmed','delivered','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
-        </select>
-      </div>
+      <div class="form-group mt-16"><label class="form-label">Cập nhật trạng thái</label><select class="form-select" id="ordStatus">
+        ${['pending','confirmed','delivered','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
+      </select></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Đóng</button>
-      <button class="btn btn-primary" onclick="updateOrderStatus('${id}')"><i data-lucide="save"></i> Cập nhật</button>
-    </div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Đóng</button><button class="btn btn-primary" onclick="updateOrderStatus('${id}')"><i data-lucide="save"></i> Cập nhật</button></div>`);
 }
 function updateOrderStatus(id) {
   const s = document.getElementById('ordStatus').value;
@@ -2440,90 +2407,54 @@ function updateOrderStatus(id) {
   if (o) { o.status = s; persist('orders'); toast('Đã cập nhật', 'success'); closeModal(); switchAdminTab('orders'); }
 }
 function deleteOrder(id) {
-  confirmDialog('Xóa đơn', 'Xóa vĩnh viễn đơn này?', () => {
+  confirmDialog('Xóa đơn', 'Xóa vĩnh viễn?', () => {
     State.orders = State.orders.filter(x => x.id !== id);
-    persist('orders');
-    switchAdminTab('orders');
+    persist('orders'); switchAdminTab('orders');
     toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: DEPOSITS ---------- */
 function renderAdminDeposits() {
-  return `
-    <div class="admin-header"><h2>Quản lý nạp tiền</h2><span class="badge badge-warning">${State.deposits.filter(d=>d.status==='pending').length} chờ duyệt</span></div>
-    ${State.deposits.length ? `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Mã nạp</th><th>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Hành động</th></tr></thead>
-        <tbody>
-          ${State.deposits.map(d => `
-            <tr>
-              <td><strong>${esc(d.id)}</strong></td>
-              <td style="color:var(--primary);font-weight:700">${fmt(d.amount)}</td>
-              <td><span class="badge badge-${statusColor(d.status)}">${statusLabel(d.status)}</span></td>
-              <td style="font-size:12px">${new Date(d.created).toLocaleString('vi-VN')}</td>
-              <td>
-                ${d.status === 'pending' ? `
-                  <button class="btn btn-success btn-sm" onclick="approveDeposit('${d.id}')"><i data-lucide="check" style="width:12px;height:12px"></i> Duyệt</button>
-                  <button class="btn btn-danger btn-sm" onclick="rejectDeposit('${d.id}')"><i data-lucide="x" style="width:12px;height:12px"></i> Từ chối</button>
-                ` : `<button class="btn btn-danger btn-sm" onclick="deleteDeposit('${d.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>`}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>` : `<div class="empty-state"><i data-lucide="wallet"></i><h3>Chưa có yêu cầu nạp tiền</h3></div>`}
-  `;
+  return `<div class="admin-header"><h2>Quản lý nạp tiền</h2><span class="badge badge-warning">${State.deposits.filter(d=>d.status==='pending').length} chờ duyệt</span></div>
+    ${State.deposits.length ? `<div class="table-wrap"><table><thead><tr><th>Mã nạp</th><th>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Hành động</th></tr></thead><tbody>
+      ${State.deposits.map(d => `<tr>
+        <td><strong>${esc(d.id)}</strong></td>
+        <td style="color:var(--primary);font-weight:700">${fmt(d.amount)}</td>
+        <td><span class="badge badge-${statusColor(d.status)}">${statusLabel(d.status)}</span></td>
+        <td style="font-size:12px">${new Date(d.created).toLocaleString('vi-VN')}</td>
+        <td>${d.status === 'pending' ? `
+          <button class="btn btn-success btn-sm" onclick="approveDeposit('${d.id}')"><i data-lucide="check" style="width:12px;height:12px"></i> Duyệt</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectDeposit('${d.id}')"><i data-lucide="x" style="width:12px;height:12px"></i> Từ chối</button>
+        ` : `<button class="btn btn-danger btn-sm" onclick="deleteDeposit('${d.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>`}</td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty-state"><i data-lucide="wallet"></i><h3>Chưa có yêu cầu nạp tiền</h3></div>`}`;
 }
-function approveDeposit(id) {
-  const d = State.deposits.find(x => x.id === id);
-  if (d) { d.status = 'confirmed'; persist('deposits'); switchAdminTab('deposits'); toast('Đã duyệt nạp tiền', 'success'); }
-}
-function rejectDeposit(id) {
-  const d = State.deposits.find(x => x.id === id);
-  if (d) { d.status = 'rejected'; persist('deposits'); switchAdminTab('deposits'); toast('Đã từ chối', 'success'); }
-}
+function approveDeposit(id) { const d = State.deposits.find(x => x.id === id); if (d) { d.status = 'confirmed'; persist('deposits'); switchAdminTab('deposits'); toast('Đã duyệt', 'success'); } }
+function rejectDeposit(id) { const d = State.deposits.find(x => x.id === id); if (d) { d.status = 'rejected'; persist('deposits'); switchAdminTab('deposits'); toast('Đã từ chối', 'success'); } }
 function deleteDeposit(id) {
-  confirmDialog('Xóa yêu cầu', 'Xóa yêu cầu nạp tiền này?', () => {
+  confirmDialog('Xóa yêu cầu', 'Xóa yêu cầu này?', () => {
     State.deposits = State.deposits.filter(x => x.id !== id);
-    persist('deposits');
-    switchAdminTab('deposits');
-    toast('Đã xóa', 'success');
+    persist('deposits'); switchAdminTab('deposits'); toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: BLOG ---------- */
 function renderAdminBlog() {
-  return `
-    <div class="admin-header"><h2>Quản lý Blog</h2><button class="btn btn-primary" onclick="openBlogForm()"><i data-lucide="plus"></i> Viết bài</button></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Ảnh</th><th>Tiêu đề</th><th>Danh mục</th><th>Views</th><th>Nổi bật</th><th>Ẩn</th><th>Hành động</th></tr></thead>
-        <tbody>
-          ${State.blog.map(b => `
-            <tr>
-              <td><img src="${esc(b.image)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px" onerror="this.src='https://via.placeholder.com/48'"></td>
-              <td><strong style="font-size:13px">${esc(b.title)}</strong></td>
-              <td>${esc(b.cat)}</td>
-              <td>${b.views}</td>
-              <td>${b.featured ? '✓' : '—'}</td>
-              <td>${b.hidden ? '✓' : '—'}</td>
-              <td>
-                <button class="btn btn-secondary btn-sm" onclick="openBlogForm('${b.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteBlog('${b.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-              </td>
-            </tr>
-          `).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px">Chưa có bài viết</td></tr>'}
-        </tbody>
-      </table>
-    </div>
-  `;
+  return `<div class="admin-header"><h2>Quản lý Blog</h2><button class="btn btn-primary" onclick="openBlogForm()"><i data-lucide="plus"></i> Viết bài</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Ảnh</th><th>Tiêu đề</th><th>Danh mục</th><th>Views</th><th>Nổi bật</th><th>Ẩn</th><th>Hành động</th></tr></thead><tbody>
+      ${State.blog.map(b => `<tr>
+        <td><img src="${esc(b.image)}" style="width:48px;height:48px;object-fit:cover;border-radius:8px" onerror="this.src='https://via.placeholder.com/48'"></td>
+        <td><strong style="font-size:13px">${esc(b.title)}</strong></td>
+        <td>${esc(b.cat)}</td><td>${b.views}</td>
+        <td>${b.featured ? '✓' : '—'}</td><td>${b.hidden ? '✓' : '—'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openBlogForm('${b.id}')"><i data-lucide="edit" style="width:12px;height:12px"></i></button><button class="btn btn-danger btn-sm" onclick="deleteBlog('${b.id}')"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></td>
+      </tr>`).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px">Chưa có bài viết</td></tr>'}
+    </tbody></table></div>`;
 }
 function openBlogForm(id) {
   const b = id ? State.blog.find(x => x.id === id) : { title: '', cat: 'Tin tức', author: State.profile.name, image: '', excerpt: '', content: '', views: 0, featured: false, hidden: false };
-  openModal(`
-    <div class="modal-header"><h3>${id ? 'Sửa' : 'Viết'} bài</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  openModal(`<div class="modal-header"><h3>${id?'Sửa':'Viết'} bài</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Tiêu đề</label><input class="form-input" id="blTitle" value="${esc(b.title)}"></div>
       <div class="form-row">
@@ -2538,65 +2469,37 @@ function openBlogForm(id) {
         <label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="checkbox" id="blHidden" ${b.hidden?'checked':''}> Ẩn</label>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveBlog(${id?`'${id}'`:'null'})"><i data-lucide="save"></i> Lưu</button></div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveBlog(${id?`'${id}'`:'null'})"><i data-lucide="save"></i> Lưu</button></div>`);
 }
 function saveBlog(id) {
   const data = {
-    title: document.getElementById('blTitle').value.trim(),
-    cat: document.getElementById('blCat').value.trim() || 'Khác',
-    author: document.getElementById('blAuthor').value.trim(),
-    image: document.getElementById('blImage').value.trim() || 'https://via.placeholder.com/800x450',
-    excerpt: document.getElementById('blExcerpt').value.trim(),
-    content: document.getElementById('blContent').value.trim(),
-    featured: document.getElementById('blFeatured').checked,
-    hidden: document.getElementById('blHidden').checked
+    title: document.getElementById('blTitle').value.trim(), cat: document.getElementById('blCat').value.trim() || 'Khác',
+    author: document.getElementById('blAuthor').value.trim(), image: document.getElementById('blImage').value.trim() || 'https://via.placeholder.com/800x450',
+    excerpt: document.getElementById('blExcerpt').value.trim(), content: document.getElementById('blContent').value.trim(),
+    featured: document.getElementById('blFeatured').checked, hidden: document.getElementById('blHidden').checked
   };
   if (!data.title) return toast('Nhập tiêu đề', 'error');
   if (id) { Object.assign(State.blog.find(x => x.id === id), data); toast('Đã cập nhật', 'success'); }
-  else { State.blog.unshift({ id: uid('b'), ...data, views: 0, date: Date.now() }); toast('Đã đăng bài', 'success'); }
-  persist('blog');
-  closeModal();
-  switchAdminTab('blog');
+  else { State.blog.unshift({ id: uid('b'), ...data, views: 0, date: Date.now() }); toast('Đã đăng', 'success'); }
+  persist('blog'); closeModal(); switchAdminTab('blog');
 }
 function deleteBlog(id) {
   confirmDialog('Xóa bài viết', 'Xóa vĩnh viễn?', () => {
     State.blog = State.blog.filter(x => x.id !== id);
-    persist('blog');
-    switchAdminTab('blog');
-    toast('Đã xóa', 'success');
+    persist('blog'); switchAdminTab('blog'); toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: FAQ ---------- */
 function renderAdminFAQ() {
-  return `
-    <div class="admin-header"><h2>Quản lý FAQ</h2><button class="btn btn-primary" onclick="openFAQForm()"><i data-lucide="plus"></i> Thêm FAQ</button></div>
-    <div>
-      ${State.faq.map((f, i) => `
-        <div class="card mb-8">
-          <div style="display:flex;justify-content:space-between;gap:12px">
-            <div style="flex:1"><strong style="font-size:13.5px">${esc(f.q)}</strong><p style="font-size:12.5px;margin-top:4px;color:var(--text-2)">${esc(f.a)}</p></div>
-            <div style="display:flex;gap:4px;flex-shrink:0">
-              <button class="btn btn-secondary btn-sm" onclick="openFAQForm(${i})"><i data-lucide="edit" style="width:12px;height:12px"></i></button>
-              <button class="btn btn-danger btn-sm" onclick="deleteFAQ(${i})"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-            </div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  return `<div class="admin-header"><h2>Quản lý FAQ</h2><button class="btn btn-primary" onclick="openFAQForm()"><i data-lucide="plus"></i> Thêm FAQ</button></div>
+    <div>${State.faq.map((f, i) => `<div class="card mb-8"><div style="display:flex;justify-content:space-between;gap:12px"><div style="flex:1"><strong style="font-size:13.5px">${esc(f.q)}</strong><p style="font-size:12.5px;margin-top:4px;color:var(--text-2)">${esc(f.a)}</p></div><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-secondary btn-sm" onclick="openFAQForm(${i})"><i data-lucide="edit" style="width:12px;height:12px"></i></button><button class="btn btn-danger btn-sm" onclick="deleteFAQ(${i})"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></div></div></div>`).join('')}</div>`;
 }
 function openFAQForm(i) {
   const f = i !== undefined ? State.faq[i] : { q: '', a: '' };
-  openModal(`
-    <div class="modal-header"><h3>${i !== undefined ? 'Sửa' : 'Thêm'} FAQ</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Câu hỏi</label><input class="form-input" id="faqQ" value="${esc(f.q)}"></div>
-      <div class="form-group"><label class="form-label">Trả lời</label><textarea class="form-textarea" id="faqA">${esc(f.a)}</textarea></div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveFAQ(${i!==undefined?i:'null'})">Lưu</button></div>
-  `);
+  openModal(`<div class="modal-header"><h3>${i!==undefined?'Sửa':'Thêm'} FAQ</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+    <div class="modal-body"><div class="form-group"><label class="form-label">Câu hỏi</label><input class="form-input" id="faqQ" value="${esc(f.q)}"></div><div class="form-group"><label class="form-label">Trả lời</label><textarea class="form-textarea" id="faqA">${esc(f.a)}</textarea></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveFAQ(${i!==undefined?i:'null'})">Lưu</button></div>`);
 }
 function saveFAQ(i) {
   const q = document.getElementById('faqQ').value.trim();
@@ -2604,48 +2507,25 @@ function saveFAQ(i) {
   if (!q || !a) return toast('Nhập đủ thông tin', 'error');
   if (i !== null) { State.faq[i] = { q, a }; toast('Đã cập nhật', 'success'); }
   else { State.faq.push({ q, a }); toast('Đã thêm', 'success'); }
-  persist('faq');
-  closeModal();
-  switchAdminTab('faq');
+  persist('faq'); closeModal(); switchAdminTab('faq');
 }
 function deleteFAQ(i) {
   confirmDialog('Xóa FAQ', 'Xóa câu hỏi này?', () => {
-    State.faq.splice(i, 1);
-    persist('faq');
-    switchAdminTab('faq');
-    toast('Đã xóa', 'success');
+    State.faq.splice(i, 1); persist('faq'); switchAdminTab('faq'); toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: REVIEWS ---------- */
 function renderAdminReviews() {
-  return `
-    <div class="admin-header"><h2>Quản lý đánh giá</h2><button class="btn btn-primary" onclick="openReviewForm()"><i data-lucide="plus"></i> Thêm đánh giá</button></div>
-    <div>
-      ${State.reviews.map((r, i) => `
-        <div class="card mb-8">
-          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                <div class="review-avatar" style="width:32px;height:32px;font-size:13px">${esc(r.avatar)}</div>
-                <div><strong style="font-size:13px">${esc(r.name)}</strong><div style="font-size:11px;color:var(--text-3)">${esc(r.date)} · ${'★'.repeat(r.rating)}</div></div>
-              </div>
-              <p style="font-size:12.5px;color:var(--text-2);margin:0">"${esc(r.text)}"</p>
-            </div>
-            <div style="display:flex;gap:4px;flex-shrink:0">
-              <button class="btn btn-secondary btn-sm" onclick="openReviewForm(${i})"><i data-lucide="edit" style="width:12px;height:12px"></i></button>
-              <button class="btn btn-danger btn-sm" onclick="deleteReview(${i})"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-            </div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  return `<div class="admin-header"><h2>Quản lý đánh giá</h2><button class="btn btn-primary" onclick="openReviewForm()"><i data-lucide="plus"></i> Thêm đánh giá</button></div>
+    <div>${State.reviews.map((r, i) => `<div class="card mb-8"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div style="flex:1">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div class="review-avatar" style="width:32px;height:32px;font-size:13px">${esc(r.avatar)}</div><div><strong style="font-size:13px">${esc(r.name)}</strong><div style="font-size:11px;color:var(--text-3)">${esc(r.date)} · ${'★'.repeat(r.rating)}</div></div></div>
+      <p style="font-size:12.5px;color:var(--text-2);margin:0">"${esc(r.text)}"</p>
+    </div><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-secondary btn-sm" onclick="openReviewForm(${i})"><i data-lucide="edit" style="width:12px;height:12px"></i></button><button class="btn btn-danger btn-sm" onclick="deleteReview(${i})"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></div></div></div>`).join('')}</div>`;
 }
 function openReviewForm(i) {
   const r = i !== undefined ? State.reviews[i] : { name: '', text: '', rating: 5, avatar: 'A', date: 'Vừa xong' };
-  openModal(`
-    <div class="modal-header"><h3>${i!==undefined?'Sửa':'Thêm'} đánh giá</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+  openModal(`<div class="modal-header"><h3>${i!==undefined?'Sửa':'Thêm'} đánh giá</h3><button class="icon-btn" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Tên</label><input class="form-input" id="rvName" value="${esc(r.name)}"></div>
@@ -2657,8 +2537,7 @@ function openReviewForm(i) {
         <div class="form-group"><label class="form-label">Thời gian</label><input class="form-input" id="rvDate" value="${esc(r.date)}"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveReview(${i!==undefined?i:'null'})">Lưu</button></div>
-  `);
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Hủy</button><button class="btn btn-primary" onclick="saveReview(${i!==undefined?i:'null'})">Lưu</button></div>`);
 }
 function saveReview(i) {
   const data = {
@@ -2671,58 +2550,38 @@ function saveReview(i) {
   if (!data.name || !data.text) return toast('Nhập đủ thông tin', 'error');
   if (i !== null) { State.reviews[i] = data; toast('Đã cập nhật', 'success'); }
   else { State.reviews.push(data); toast('Đã thêm', 'success'); }
-  persist('reviews');
-  closeModal();
-  switchAdminTab('reviews');
+  persist('reviews'); closeModal(); switchAdminTab('reviews');
 }
 function deleteReview(i) {
-  confirmDialog('Xóa đánh giá', 'Xóa đánh giá này?', () => {
-    State.reviews.splice(i, 1);
-    persist('reviews');
-    switchAdminTab('reviews');
-    toast('Đã xóa', 'success');
+  confirmDialog('Xóa đánh giá', 'Xóa?', () => {
+    State.reviews.splice(i, 1); persist('reviews'); switchAdminTab('reviews'); toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: MESSAGES ---------- */
 function renderAdminMessages() {
-  return `
-    <div class="admin-header"><h2>Hộp thư liên hệ</h2><span class="badge badge-info">${State.messages.length} tin</span></div>
-    ${State.messages.length ? `
-    <div>
-      ${State.messages.map(m => `
-        <div class="card mb-8">
-          <div style="display:flex;justify-content:space-between;gap:12px">
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-                <strong style="font-size:14px">${esc(m.name)}</strong>
-                <span class="badge badge-primary" style="font-size:10px">${esc(m.phone)}</span>
-                ${m.email ? `<span class="badge badge-info" style="font-size:10px">${esc(m.email)}</span>` : ''}
-                <span style="font-size:11px;color:var(--text-3)">${new Date(m.created).toLocaleString('vi-VN')}</span>
-              </div>
-              <p style="font-size:13px;color:var(--text-2);margin:0">${esc(m.message)}</p>
-            </div>
-            <button class="btn btn-danger btn-sm" onclick="deleteMessage('${m.id}')" style="flex-shrink:0"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button>
-          </div>
-        </div>
-      `).join('')}
-    </div>` : `<div class="empty-state"><i data-lucide="inbox"></i><h3>Chưa có tin nhắn</h3></div>`}
-  `;
+  return `<div class="admin-header"><h2>Hộp thư liên hệ</h2><span class="badge badge-info">${State.messages.length} tin</span></div>
+    ${State.messages.length ? `<div>${State.messages.map(m => `<div class="card mb-8"><div style="display:flex;justify-content:space-between;gap:12px"><div style="flex:1">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <strong style="font-size:14px">${esc(m.name)}</strong>
+        <span class="badge badge-primary" style="font-size:10px">${esc(m.phone)}</span>
+        ${m.email ? `<span class="badge badge-info" style="font-size:10px">${esc(m.email)}</span>` : ''}
+        <span style="font-size:11px;color:var(--text-3)">${new Date(m.created).toLocaleString('vi-VN')}</span>
+      </div>
+      <p style="font-size:13px;color:var(--text-2);margin:0">${esc(m.message)}</p>
+    </div><button class="btn btn-danger btn-sm" onclick="deleteMessage('${m.id}')" style="flex-shrink:0"><i data-lucide="trash-2" style="width:12px;height:12px"></i></button></div></div>`).join('')}</div>` : `<div class="empty-state"><i data-lucide="inbox"></i><h3>Chưa có tin nhắn</h3></div>`}`;
 }
 function deleteMessage(id) {
   confirmDialog('Xóa tin nhắn', 'Xóa tin này?', () => {
     State.messages = State.messages.filter(x => x.id !== id);
-    persist('messages');
-    switchAdminTab('messages');
-    toast('Đã xóa', 'success');
+    persist('messages'); switchAdminTab('messages'); toast('Đã xóa', 'success');
   }, true);
 }
 
 /* ---------- ADMIN: BANK ---------- */
 function renderAdminBank() {
   const b = State.bank;
-  return `
-    <div class="admin-header"><h2>Thông tin ngân hàng</h2></div>
+  return `<div class="admin-header"><h2>Thông tin ngân hàng</h2></div>
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px">
       <div class="card">
         <h3 class="mb-16">Cấu hình</h3>
@@ -2745,54 +2604,43 @@ function renderAdminBank() {
         <div class="info-row"><span class="k">BIN</span><span class="v">${esc(b.bankBin)}</span></div>
       </div>
     </div>
-    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 function saveBank() {
   State.bank = {
-    bankName: document.getElementById('bkName').value.trim(),
-    bankBin: document.getElementById('bkBin').value.trim(),
-    accountNumber: document.getElementById('bkAcc').value.trim(),
-    accountName: document.getElementById('bkOwner').value.trim(),
+    bankName: document.getElementById('bkName').value.trim(), bankBin: document.getElementById('bkBin').value.trim(),
+    accountNumber: document.getElementById('bkAcc').value.trim(), accountName: document.getElementById('bkOwner').value.trim(),
     minDeposit: parseInt(document.getElementById('bkMin').value) || 10000,
     suggestedAmounts: document.getElementById('bkSug').value.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x > 0)
   };
   persist('bank');
-  toast('Đã lưu thông tin ngân hàng', 'success');
+  toast('Đã lưu ngân hàng', 'success');
   switchAdminTab('bank');
 }
 
 /* ---------- ADMIN: APPEARANCE ---------- */
 function renderAdminAppearance() {
   const s = State.settings;
-  return `
-    <div class="admin-header"><h2>Cài đặt giao diện</h2></div>
+  return `<div class="admin-header"><h2>Cài đặt giao diện</h2></div>
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px">
       <div class="card">
         <h3 class="mb-16">Màu sắc & Theme</h3>
-        <div class="form-group"><label class="form-label">Theme</label>
-          <select class="form-select" id="apTheme"><option value="light" ${s.theme==='light'?'selected':''}>Light</option><option value="dark" ${s.theme==='dark'?'selected':''}>Dark</option></select>
-        </div>
+        <div class="form-group"><label class="form-label">Theme</label><select class="form-select" id="apTheme"><option value="light" ${s.theme==='light'?'selected':''}>Light</option><option value="dark" ${s.theme==='dark'?'selected':''}>Dark</option></select></div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Màu chính</label><input type="color" class="form-input" id="apPrimary" value="${s.primaryColor}" style="height:44px"></div>
           <div class="form-group"><label class="form-label">Màu phụ</label><input type="color" class="form-input" id="apSecondary" value="${s.secondaryColor}" style="height:44px"></div>
         </div>
-        <div class="form-group"><label class="form-label">Bo góc (px)</label><select class="form-select" id="apRadius">
-          ${['8px','12px','16px','20px','24px'].map(r => `<option value="${r}" ${s.radius===r?'selected':''}>${r}</option>`).join('')}
-        </select></div>
+        <div class="form-group"><label class="form-label">Bo góc</label><select class="form-select" id="apRadius">${['8px','12px','16px','20px','24px'].map(r => `<option value="${r}" ${s.radius===r?'selected':''}>${r}</option>`).join('')}</select></div>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:14px"><input type="checkbox" id="apAnim" ${s.animations?'checked':''}> Bật hiệu ứng</label>
-        <button class="btn btn-primary btn-block" onclick="saveAppearance()"><i data-lucide="save"></i> Lưu cài đặt</button>
+        <button class="btn btn-primary btn-block" onclick="saveAppearance()"><i data-lucide="save"></i> Lưu</button>
       </div>
       <div class="card">
         <h3 class="mb-16">Bật/tắt khu vực</h3>
-        ${[['showHero','Hero Section'],['showFeatures','Features'],['showProcess','Quy trình'],['showReviews','Đánh giá'],['showFAQ','FAQ'],['showBlog','Blog']].map(([k,l]) => `
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;padding:10px;background:var(--bg-3);border-radius:8px"><input type="checkbox" id="ap_${k}" ${s[k]?'checked':''}> ${l}</label>
-        `).join('')}
+        ${[['showHero','Hero Section'],['showFeatures','Features'],['showProcess','Quy trình'],['showReviews','Đánh giá'],['showFAQ','FAQ'],['showBlog','Blog']].map(([k,l]) => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;padding:10px;background:var(--bg-3);border-radius:8px"><input type="checkbox" id="ap_${k}" ${s[k]?'checked':''}> ${l}</label>`).join('')}
         <button class="btn btn-primary btn-block mt-16" onclick="saveSections()"><i data-lucide="save"></i> Lưu</button>
       </div>
     </div>
-    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>
-  `;
+    <style>@media(max-width:768px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}}</style>`;
 }
 function saveAppearance() {
   State.settings.theme = document.getElementById('apTheme').value;
@@ -2800,36 +2648,33 @@ function saveAppearance() {
   State.settings.secondaryColor = document.getElementById('apSecondary').value;
   State.settings.radius = document.getElementById('apRadius').value;
   State.settings.animations = document.getElementById('apAnim').checked;
-  persist('settings');
-  applySettings();
-  toast('Đã lưu giao diện', 'success');
+  persist('settings'); applySettings();
+  toast('Đã lưu — đã sync cloud', 'success');
   switchAdminTab('appearance');
 }
 function saveSections() {
   ['showHero','showFeatures','showProcess','showReviews','showFAQ','showBlog'].forEach(k => {
     State.settings[k] = document.getElementById('ap_'+k).checked;
   });
-  persist('settings');
-  toast('Đã lưu', 'success');
+  persist('settings'); toast('Đã lưu', 'success');
 }
 
 /* ---------- ADMIN: CONTENT ---------- */
 function renderAdminContentSettings() {
   const s = State.settings;
-  return `
-    <div class="admin-header"><h2>Nội dung trang chủ</h2></div>
+  return `<div class="admin-header"><h2>Nội dung trang chủ</h2></div>
     <div class="card">
-      <div class="form-group"><label class="form-label">Site title (tab browser)</label><input class="form-input" id="cnTitle" value="${esc(s.siteTitle)}"></div>
+      <div class="form-group"><label class="form-label">Site title</label><input class="form-input" id="cnTitle" value="${esc(s.siteTitle)}"></div>
       <div class="form-group"><label class="form-label">Hero badge</label><input class="form-input" id="cnBadge" value="${esc(s.heroBadge)}"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Hero title</label><input class="form-input" id="cnHTitle" value="${esc(s.heroTitle)}"></div>
         <div class="form-group"><label class="form-label">Hero accent</label><input class="form-input" id="cnHAccent" value="${esc(s.heroTitleAccent)}"></div>
       </div>
       <div class="form-group"><label class="form-label">Hero description</label><textarea class="form-textarea" id="cnHDesc">${esc(s.heroDesc)}</textarea></div>
-      <button class="btn btn-primary" onclick="saveContent()"><i data-lucide="save"></i> Lưu nội dung</button>
+      <button class="btn btn-primary" onclick="saveContent()"><i data-lucide="save"></i> Lưu</button>
     </div>
     <div class="card mt-16">
-      <h3 class="mb-16">Thông tin liên hệ (footer/contact)</h3>
+      <h3 class="mb-16">Thông tin liên hệ</h3>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="cnEmail" value="${esc(State.contact.email)}"></div>
         <div class="form-group"><label class="form-label">Hotline</label><input class="form-input" id="cnPhone" value="${esc(State.contact.hotline)}"></div>
@@ -2843,8 +2688,7 @@ function renderAdminContentSettings() {
         <div class="form-group"><label class="form-label">Địa chỉ</label><input class="form-input" id="cnAddr" value="${esc(State.contact.address)}"></div>
       </div>
       <button class="btn btn-primary" onclick="saveContact()"><i data-lucide="save"></i> Lưu liên hệ</button>
-    </div>
-  `;
+    </div>`;
 }
 function saveContent() {
   State.settings.siteTitle = document.getElementById('cnTitle').value.trim();
@@ -2852,22 +2696,17 @@ function saveContent() {
   State.settings.heroTitle = document.getElementById('cnHTitle').value.trim();
   State.settings.heroTitleAccent = document.getElementById('cnHAccent').value.trim();
   State.settings.heroDesc = document.getElementById('cnHDesc').value.trim();
-  persist('settings');
-  applySettings();
-  toast('Đã lưu nội dung', 'success');
+  persist('settings'); applySettings();
+  toast('Đã lưu — đã sync cloud', 'success');
 }
 function saveContact() {
   State.contact = {
-    email: document.getElementById('cnEmail').value.trim(),
-    hotline: document.getElementById('cnPhone').value.trim(),
-    facebook: document.getElementById('cnFB').value.trim(),
-    zalo: document.getElementById('cnZalo').value.trim(),
-    telegram: document.getElementById('cnTG').value.trim(),
-    address: document.getElementById('cnAddr').value.trim()
+    email: document.getElementById('cnEmail').value.trim(), hotline: document.getElementById('cnPhone').value.trim(),
+    facebook: document.getElementById('cnFB').value.trim(), zalo: document.getElementById('cnZalo').value.trim(),
+    telegram: document.getElementById('cnTG').value.trim(), address: document.getElementById('cnAddr').value.trim()
   };
-  persist('contact');
-  renderFooterInfo();
-  toast('Đã lưu liên hệ', 'success');
+  persist('contact'); renderFooterInfo();
+  toast('Đã lưu — đã sync cloud', 'success');
 }
 
 /* ---------- ADMIN: BACKUP ---------- */
@@ -2876,10 +2715,9 @@ function renderAdminBackup() {
     profile: State.profile, products: State.products, blog: State.blog,
     orders: State.orders, deposits: State.deposits, messages: State.messages
   }).length;
-  return `
-    <div class="admin-header"><h2>Sao lưu & Khôi phục</h2></div>
+  return `<div class="admin-header"><h2>Sao lưu & Khôi phục</h2></div>
     <div class="card mb-16" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)">
-      <strong style="color:var(--warning)">⚠️ Quan trọng:</strong> Dữ liệu được lưu hoàn toàn trên trình duyệt (localStorage). Nếu bạn xóa cache, đổi máy hoặc dùng trình duyệt khác, dữ liệu sẽ KHÔNG tự động đồng bộ. Hãy sao lưu thường xuyên!
+      <strong style="color:var(--warning)">💡 Gợi ý:</strong> Để tự động đồng bộ dữ liệu cho tất cả người dùng, hãy bật <strong>Cloud Sync</strong> trong menu trái. Sao lưu file JSON chỉ là biện pháp dự phòng.
     </div>
     <div class="grid grid-2">
       <div class="card">
@@ -2889,7 +2727,7 @@ function renderAdminBackup() {
       </div>
       <div class="card">
         <h3 class="mb-16">Nhập dữ liệu</h3>
-        <p class="text-muted mb-16" style="font-size:13px">Chọn file JSON đã sao lưu trước đó.</p>
+        <p class="text-muted mb-16" style="font-size:13px">Chọn file JSON đã sao lưu.</p>
         <input type="file" accept=".json" id="importFile" class="form-input mb-8">
         <button class="btn btn-success btn-block" onclick="importData()"><i data-lucide="upload"></i> Khôi phục từ file</button>
       </div>
@@ -2898,8 +2736,7 @@ function renderAdminBackup() {
       <h3 class="mb-8" style="color:var(--danger)">Vùng nguy hiểm</h3>
       <p class="text-muted mb-16" style="font-size:13px">Xóa toàn bộ dữ liệu và reset về mặc định. Không thể hoàn tác!</p>
       <button class="btn btn-danger" onclick="resetAll()"><i data-lucide="alert-triangle"></i> Reset toàn bộ dữ liệu</button>
-    </div>
-  `;
+    </div>`;
 }
 function exportData() {
   const data = {
@@ -2919,29 +2756,27 @@ function exportData() {
 }
 function importData() {
   const file = document.getElementById('importFile').files[0];
-  if (!file) return toast('Chọn file để nhập', 'error');
+  if (!file) return toast('Chọn file', 'error');
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
       confirmDialog('Khôi phục dữ liệu', 'Dữ liệu hiện tại sẽ bị ghi đè. Tiếp tục?', () => {
         ['profile','contact','bank','products','categories','blog','faq','reviews','settings','orders','deposits','messages'].forEach(k => {
-          if (data[k] !== undefined) {
-            State[k] = data[k];
-            Storage.set(k, data[k]);
-          }
+          if (data[k] !== undefined) { State[k] = data[k]; Storage.set(k, data[k]); }
         });
-        applySettings();
-        renderFooterInfo();
+        // Sync after import
+        SYNC_KEYS.forEach(k => scheduleCloudPush());
+        applySettings(); renderFooterInfo();
         toast('Khôi phục thành công! Đang tải lại...', 'success');
         setTimeout(() => window.location.reload(), 1200);
       });
-    } catch (err) { toast('File JSON không hợp lệ: ' + err.message, 'error'); }
+    } catch (err) { toast('JSON lỗi: ' + err.message, 'error'); }
   };
   reader.readAsText(file);
 }
 function resetAll() {
-  confirmDialog('RESET TOÀN BỘ', 'Toàn bộ dữ liệu sẽ bị xóa vĩnh viễn. Bạn CHẮC CHẮN muốn reset?', () => {
+  confirmDialog('RESET TOÀN BỘ', 'Toàn bộ dữ liệu sẽ bị xóa vĩnh viễn. Chắc chắn?', () => {
     Storage.clearAll();
     toast('Đã reset, đang tải lại...', 'success');
     setTimeout(() => window.location.reload(), 800);
@@ -2953,9 +2788,7 @@ function resetAll() {
    ============================================================ */
 function renderFooterInfo() {
   const c = State.contact;
-  const map = {
-    footerEmail: c.email, footerPhone: c.hotline, footerAddress: c.address
-  };
+  const map = { footerEmail: c.email, footerPhone: c.hotline, footerAddress: c.address };
   Object.entries(map).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
   const socEl = document.getElementById('footerSocials');
   if (socEl) {
@@ -2965,41 +2798,88 @@ function renderFooterInfo() {
   const yr = document.getElementById('footerYear'); if (yr) yr.textContent = new Date().getFullYear();
 }
 
+/* ---------- CLOUD LOADER HELPERS ---------- */
+function showCloudLoader(msg) {
+  const el = document.getElementById('cloudLoader');
+  if (el) { el.classList.remove('hide'); const m = document.getElementById('cloudLoaderMsg'); if (m && msg) m.textContent = msg; }
+}
+function hideCloudLoader() {
+  const el = document.getElementById('cloudLoader');
+  if (el) {
+    el.classList.add('hide');
+    setTimeout(() => el.style.display = 'none', 400);
+  }
+}
+
 /* ---------- BOOTSTRAP ---------- */
-document.addEventListener('DOMContentLoaded', () => {
+async function boot() {
   initData();
+  Cloud.init();
+
+  // Show loader only if cloud configured
+  if (Cloud.enabled) {
+    showCloudLoader('Đang tải dữ liệu mới nhất...');
+  }
+
+  // Try cloud pull (with timeout built-in)
+  try {
+    const changed = await syncFromCloud();
+    if (changed) console.log('[Boot] Applied fresh cloud data');
+  } catch (e) {
+    console.warn('[Boot] Cloud sync skipped:', e);
+  }
+
+  hideCloudLoader();
+
+  // Render
   renderRoute();
   updateCartBadge();
   renderFooterInfo();
+  reinitIcons();
+
   // Theme icon
   const icon = document.querySelector('#themeToggle i');
   if (icon && State.settings.theme === 'dark') icon.setAttribute('data-lucide', 'sun');
   reinitIcons();
-  // Global listeners
+
+  // Listeners
   document.getElementById('themeToggle').addEventListener('click', toggleTheme);
   window.addEventListener('hashchange', () => { closeMobileNav(); closeCart(); renderRoute(); });
-  // ESC to close
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeModal(); closeCart(); closeMobileNav(); }
   });
-  // Login input Enter
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.activeElement?.id === 'adminPwd') doLogin();
   });
-  // Re-init icons after any dynamic render
-  setInterval(() => {
-    // Safety: re-run lucide on new elements
-    if (window.lucide) reinitIcons();
-  }, 1500);
-});
 
-// Handle initial load if DOMContentLoaded already fired
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  setTimeout(() => { if (!State.profile) { initData(); renderRoute(); updateCartBadge(); renderFooterInfo(); reinitIcons(); } }, 10);
+  // Try push pending on unload (in case admin closed tab quickly)
+  window.addEventListener('beforeunload', () => {
+    if (Cloud.enabled && _cloudPushTimer) {
+      clearTimeout(_cloudPushTimer);
+      try {
+        const payload = getSyncPayload();
+        fetch(`https://api.jsonbin.io/v3/b/${Cloud.config.binId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': Cloud.config.apiKey
+          },
+          body: JSON.stringify(payload),
+          keepalive: true
+        });
+      } catch (e) { }
+    }
+  });
+
+  // Safety re-init icons periodically
+  setInterval(() => { if (window.lucide) reinitIcons(); }, 1500);
+
+  console.log('%c⚡ NexusStore v' + APP_CONFIG.VERSION + ' ready', 'color:#6366f1;font-weight:bold;font-size:14px');
+  console.log('%cAdmin: #/admin | Cloud: ' + (Cloud.enabled ? 'ON' : 'OFF'), 'color:#ec4899;font-size:12px');
 }
 
-console.log('%c⚡ NexusStore v' + APP_CONFIG.VERSION + ' loaded', 'color:#6366f1;font-weight:bold;font-size:14px');
-console.log('%cAdmin: truy cập #/admin', 'color:#ec4899;font-size:12px');
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
 </script>
 </body>
 </html>
