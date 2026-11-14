@@ -15821,7 +15821,7 @@ async function verifyDatabase() {
   }
 
   try {
-    // Kiểm tra bảng site_state có dữ liệu chưa
+// Kiểm tra bảng site_state có dữ liệu chưa
     const { data, error } = await sb.from('site_state').select('id').eq('id', 1).maybeSingle();
     
     if (error && error.code !== 'PGRST116') {
@@ -15890,86 +15890,5 @@ console.log('[Part 20/20] Final Boot Script READY ✓');
      KẾT THÚC TOÀN BỘ DỰ ÁN AURORA (20/20 PHẦN)
      ═══════════════════════════════════════════════════════════ -->
 <!-- ═══════════════════════════════════════════════════════════
-     MEGA FIX: KHẮC PHỤC LỖI ROUTE & LOADING
-     Dán đoạn này ở cuối file index.html (trước </body>)
-     ═══════════════════════════════════════════════════════════ -->
-<script>
-(function () {
-'use strict';
-const A = window.Aurora;
-if (!A) return;
-
-console.log("🛠️ Đang chạy MEGA FIX cho các Route...");
-
-// 1. SỬA LỖI TRANG CHỦ (HOME)
-A.Routes.home = function(target) {
-    try {
-        // Gọi lại giao diện gốc từ Part 3 (nếu có) hoặc dùng fallback
-        if (A.__originalHomeRender) {
-            A.__originalHomeRender(target);
-        } else {
-            target.innerHTML = `<div class="container section" style="text-align:center;padding:100px 20px">
-                <div class="section-eyebrow">${A.svg('sparkles')} Premium Platform</div>
-                <h1 class="section-title" style="margin-top:20px">Chào mừng đến với <span class="grad-text">Aurora</span></h1>
-                <p class="section-desc" style="margin-bottom:24px">Nền tảng số cao cấp cho Creator & Gamer</p>
-                <a href="#/shop" class="btn btn-primary" data-nav="/shop">Khám phá Shop</a>
-            </div>`;
-        }
-    } catch(e) {
-        console.error("Home Render Error:", e);
-        target.innerHTML = `<div class="container section"><h1>Lỗi tải trang chủ</h1><p>Vui lòng F5 để thử lại.</p></div>`;
-    }
-};
-
-// 2. KHÔI PHỤC TRANG GIỎ HÀNG (CART)
-if (typeof A.Routes.cart !== 'function' || A.Routes.cart.toString().includes('đang được tải')) {
-    A.Routes.cart = function(target) {
-        if (typeof A.__originalCartRender === 'function') {
-            A.__originalCartRender(target);
-        } else {
-            target.innerHTML = `<div class="container section" style="text-align:center;padding:80px 20px">
-                <h1 class="section-title">Giỏ hàng</h1>
-                <p style="color:var(--text-2);margin-top:16px">Vui lòng dán code của <b>Phần 5</b> vào file để hiển thị giỏ hàng.</p>
-            </div>`;
-        }
-    };
-}
-
-// 3. KHÔI PHỤC TRANG VÍ TIỀN (WALLET)
-if (typeof A.Routes.wallet !== 'function' || A.Routes.wallet.toString().includes('đang được tải')) {
-    A.Routes.wallet = function(target) {
-        if (typeof A.__originalWalletRender === 'function') {
-            A.__originalWalletRender(target);
-        } else {
-            target.innerHTML = `<div class="container section" style="text-align:center;padding:80px 20px">
-                <h1 class="section-title">Ví điện tử</h1>
-                <p style="color:var(--text-2);margin-top:16px">Vui lòng dán code của <b>Phần 9</b> vào file để hiển thị ví.</p>
-            </div>`;
-        }
-    };
-}
-
-// 4. KHÔI PHỤC TRANG ADMIN
-if (typeof A.Routes.admin !== 'function' || A.Routes.admin.toString().includes('đang được tải')) {
-    A.Routes.admin = function(target) {
-        if (typeof A.__originalAdminRender === 'function') {
-            A.__originalAdminRender(target);
-        } else {
-            target.innerHTML = `<div class="container section" style="text-align:center;padding:80px 20px">
-                <h1 class="section-title">Admin Dashboard</h1>
-                <p style="color:var(--text-2);margin-top:16px">Vui lòng dán code của <b>Phần 6</b> vào file để hiển thị Admin.</p>
-            </div>`;
-        }
-    };
-}
-
-// Tự động tải lại trang hiện tại để áp dụng bản vá
-setTimeout(() => {
-    if (A.dispatchRoute) A.dispatchRoute();
-    console.log("✅ Đã áp dụng MEGA FIX!");
-}, 500);
-
-})();
-</script>
 </body>
 </html>
